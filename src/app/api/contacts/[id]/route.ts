@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const contact = await prisma.contact.findUnique({
+    where: { id: params.id },
+    include: {
+      interactions: { orderBy: { date: 'desc' }, take: 20 },
+      signals: { orderBy: { detectedAt: 'desc' }, take: 10 },
+    },
+  })
+
+  if (!contact) {
+    return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
+  }
+
+  return NextResponse.json(contact)
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const body = await request.json()
+
+  const contact = await prisma.contact.update({
+    where: { id: params.id },
+    data: {
+      name: body.name,
+      title: body.title,
+      organization: body.organization,
+      email: body.email,
+      phone: body.phone,
+      linkedinUrl: body.linkedinUrl,
+      twitterHandle: body.twitterHandle,
+      personalWebsite: body.personalWebsite,
+      tier: body.tier,
+      categories: JSON.stringify(body.categories || []),
+      tags: JSON.stringify(body.tags || []),
+      targetCadenceDays: body.targetCadenceDays,
+      status: body.status,
+      introductionPathway: body.introductionPathway,
+      connectionToHawleyOrbit: body.connectionToHawleyOrbit,
+      whyTheyMatter: body.whyTheyMatter,
+      notes: body.notes,
+      updatedAt: new Date().toISOString(),
+    },
+  })
+
+  return NextResponse.json(contact)
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  await prisma.contact.delete({ where: { id: params.id } })
+  return NextResponse.json({ success: true })
+}

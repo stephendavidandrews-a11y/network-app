@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Contact {
+  id                      String   @id @default(uuid())
+  name                    String
+  title                   String?
+  organization            String?
+  email                   String?
+  phone                   String?
+  linkedinUrl             String?  @map("linkedin_url")
+  twitterHandle           String?  @map("twitter_handle")
+  personalWebsite         String?  @map("personal_website")
+  photoUrl                String?  @map("photo_url")
+
+  tier                    Int
+  categories              String   @default("[]")
+  tags                    String   @default("[]")
+
+  targetCadenceDays       Int      @default(60) @map("target_cadence_days")
+  lastInteractionDate     String?  @map("last_interaction_date")
+
+  relationshipStrength    Float    @default(0) @map("relationship_strength")
+  strategicValue          Float    @default(0) @map("strategic_value")
+
+  introductionPathway     String?  @map("introduction_pathway")
+  connectionToHawleyOrbit String?  @map("connection_to_hawley_orbit")
+  whyTheyMatter           String?  @map("why_they_matter")
+
+  status                  String   @default("target")
+  notes                   String?
+
+  createdAt               String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt               String   @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  interactions            Interaction[]
+  signals                 IntelligenceSignal[]
+  outreachItems           OutreachQueue[]
+  relationshipsAsA        ContactRelationship[] @relation("ContactA")
+  relationshipsAsB        ContactRelationship[] @relation("ContactB")
+
+  @@index([tier])
+  @@index([status])
+  @@index([lastInteractionDate])
+  @@map("contacts")
+}
+
+model Interaction {
+  id                    String   @id @default(uuid())
+  contactId             String   @map("contact_id")
+  type                  String
+  date                  String   @default(dbgenerated("(date('now'))"))
+  summary               String?
+
+  commitments           String   @default("[]")
+  newContactsMentioned  String   @default("[]") @map("new_contacts_mentioned")
+
+  followUpRequired      Boolean  @default(false) @map("follow_up_required")
+  followUpDescription   String?  @map("follow_up_description")
+  followUpCompleted     Boolean  @default(false) @map("follow_up_completed")
+  followUpCompletedDate String?  @map("follow_up_completed_date")
+
+  source                String   @default("manual")
+  createdAt             String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact               Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, date(sort: Desc)])
+  @@map("interactions")
+}
+
+model IntelligenceSignal {
+  id             String   @id @default(uuid())
+  contactId      String   @map("contact_id")
+  signalType     String   @map("signal_type")
+  title          String
+  description    String?
+  sourceUrl      String?  @map("source_url")
+  sourceName     String?  @map("source_name")
+  detectedAt     String   @default(dbgenerated("(datetime('now'))")) @map("detected_at")
+  outreachHook   String?  @map("outreach_hook")
+  hookUsed       Boolean  @default(false) @map("hook_used")
+  relevanceScore Float    @default(5.0) @map("relevance_score")
+  createdAt      String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  outreachItems  OutreachQueue[]
+
+  @@index([contactId, detectedAt(sort: Desc)])
+  @@index([detectedAt(sort: Desc)])
+  @@map("intelligence_signals")
+}
+
+model Event {
+  id                     String   @id @default(uuid())
+  name                   String
+  organizer              String?
+  location               String?
+  dateStart              String?  @map("date_start")
+  dateEnd                String?  @map("date_end")
+  eventUrl               String?  @map("event_url")
+  eventType              String?  @map("event_type")
+  topicRelevanceScore    Float    @default(5.0) @map("topic_relevance_score")
+  topics                 String   @default("[]")
+  hasSpeakingOpportunity Boolean  @default(false) @map("has_speaking_opportunity")
+  cfpDeadline            String?  @map("cfp_deadline")
+  cfpUrl                 String?  @map("cfp_url")
+  cfpStatus              String   @default("not_applicable") @map("cfp_status")
+  abstractDraft          String?  @map("abstract_draft")
+  contactsAttending      String   @default("[]") @map("contacts_attending")
+  contactsSpeaking       String   @default("[]") @map("contacts_speaking")
+  preEventOutreachSent   Boolean  @default(false) @map("pre_event_outreach_sent")
+  postEventFollowupSent  Boolean  @default(false) @map("post_event_followup_sent")
+  attending              Boolean  @default(false)
+  speaking               Boolean  @default(false)
+  notes                  String?
+  createdAt              String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt              String   @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  outreachItems          OutreachQueue[]
+
+  @@index([dateStart])
+  @@map("events")
+}
+
+model OutreachQueue {
+  id                 String   @id @default(uuid())
+  contactId          String   @map("contact_id")
+  triggerType        String   @map("trigger_type")
+  triggerDescription String   @map("trigger_description")
+  signalId           String?  @map("signal_id")
+  eventId            String?  @map("event_id")
+  priority           Int      @default(3)
+  draftSubject       String?  @map("draft_subject")
+  draftBody          String?  @map("draft_body")
+  draftFormat        String   @default("email") @map("draft_format")
+  aiModelUsed        String?  @map("ai_model_used")
+  contextPackage     String?  @map("context_package")
+  status             String   @default("queued")
+  originalDraft      String?  @map("original_draft")
+  finalText          String?  @map("final_text")
+  wasEdited          Boolean  @default(false) @map("was_edited")
+  createdAt          String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  reviewedAt         String?  @map("reviewed_at")
+  sentAt             String?  @map("sent_at")
+  deferredUntil      String?  @map("deferred_until")
+  notes              String?
+
+  contact            Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  signal             IntelligenceSignal? @relation(fields: [signalId], references: [id])
+  event              Event?             @relation(fields: [eventId], references: [id])
+
+  @@index([status, priority])
+  @@index([contactId, createdAt(sort: Desc)])
+  @@map("outreach_queue")
+}
+
+model ContactRelationship {
+  id               String   @id @default(uuid())
+  contactAId       String   @map("contact_a_id")
+  contactBId       String   @map("contact_b_id")
+  relationshipType String?  @map("relationship_type")
+  strength         Int      @default(3)
+  source           String   @default("manual")
+  notes            String?
+  createdAt        String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contactA         Contact  @relation("ContactA", fields: [contactAId], references: [id], onDelete: Cascade)
+  contactB         Contact  @relation("ContactB", fields: [contactBId], references: [id], onDelete: Cascade)
+
+  @@unique([contactAId, contactBId])
+  @@index([contactAId])
+  @@index([contactBId])
+  @@map("contact_relationships")
+}
+
+model DailyBriefing {
+  id          String   @id @default(uuid())
+  date        String   @unique @default(dbgenerated("(date('now'))"))
+  content     String
+  generatedAt String   @default(dbgenerated("(datetime('now'))")) @map("generated_at")
+
+  @@map("daily_briefings")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt String   @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  @@map("app_settings")
+}
