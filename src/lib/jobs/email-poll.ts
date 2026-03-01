@@ -47,6 +47,7 @@ function parseEmail(text: string): {
     '---------- Forwarded message ---------',   // quoted-printable may truncate
     '-----Original Message-----',
     '--- Forwarded message ---',
+    'Begin forwarded message:',                  // Apple Mail / Outlook forward
   ]
 
   let fwdDetected = false
@@ -276,6 +277,27 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
             })
             continue
           }
+
+          // Decode base64 MIME body parts if present
+          // Outlook/Apple Mail forwarded emails often have base64-encoded text/plain parts
+          const base64Match = textContent.match(/Content-Transfer-Encoding:\s*base64\s*\r?\n\r?\n([A-Za-z0-9+/=\s]+)/i)
+          if (base64Match) {
+            try {
+              const decoded = Buffer.from(base64Match[1].replace(/\s/g, ''), 'base64').toString('utf-8')
+              // Replace the base64 block with decoded text
+              textContent = textContent.substring(0, base64Match.index || 0) + decoded + textContent.substring((base64Match.index || 0) + base64Match[0].length)
+            } catch {
+              // If decode fails, continue with raw content
+            }
+          }
+
+          // Decode HTML entities
+          textContent = textContent
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&#39;/g, "'")
+            .replace(/&quot;/g, '"')
 
           // Strip HTML tags if present
           textContent = textContent.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()

@@ -36,6 +36,7 @@ function extractForwardedHeaders(text: string): {
     '---------- Forwarded message ---------',
     '-----Original Message-----',
     '--- Forwarded message ---',
+    'Begin forwarded message:',
   ]
 
   let detected = false
@@ -133,8 +134,21 @@ export async function POST() {
     let unchanged = 0
 
     for (const item of items) {
-      // Clean up raw content: decode HTML entities + strip quoted-printable artifacts
-      let rawContent = (item.rawContent || '')
+      // Clean up raw content: decode base64, HTML entities, and quoted-printable
+      let rawContent = item.rawContent || ''
+
+      // Decode base64 MIME body if present (Outlook/Apple Mail forwards)
+      const base64Match = rawContent.match(/Content-Transfer-Encoding:\s*base64\s*\r?\n\r?\n([A-Za-z0-9+/=\s]+)/i)
+      if (base64Match) {
+        try {
+          const decoded = Buffer.from(base64Match[1].replace(/\s/g, ''), 'base64').toString('utf-8')
+          rawContent = rawContent.substring(0, base64Match.index || 0) + decoded + rawContent.substring((base64Match.index || 0) + base64Match[0].length)
+        } catch {
+          // If decode fails, continue with raw content
+        }
+      }
+
+      rawContent = rawContent
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&amp;/g, '&')
