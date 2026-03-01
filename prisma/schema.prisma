@@ -51,11 +51,13 @@ model Contact {
   relationshipsAsB  ContactRelationship[] @relation("ContactB")
   meetingPreps      MeetingPrep[]
   commitmentRecords Commitment[]
-  enrichmentResults EnrichmentResult[]
-  standingOffers    StandingOffer[]
-  schedulingLeads   SchedulingLead[]
-  dossierVersions   ContactDossier[]
-  ingestionItems    IngestionItem[]
+  enrichmentResults    EnrichmentResult[]
+  standingOffers       StandingOffer[]
+  schedulingLeads      SchedulingLead[]
+  lifeEvents           LifeEvent[]
+  referencedResources  ReferencedResource[]
+  dossierVersions      ContactDossier[]
+  ingestionItems       IngestionItem[]
 
   @@index([tier])
   @@index([status])
@@ -77,6 +79,12 @@ model Interaction {
   followUpDescription   String? @map("follow_up_description")
   followUpCompleted     Boolean @default(false) @map("follow_up_completed")
   followUpCompletedDate String? @map("follow_up_completed_date")
+
+  // Relationship intelligence fields
+  sentiment         String? // warm, neutral, transactional, tense, enthusiastic
+  relationshipDelta String? @map("relationship_delta") // strengthened, maintained, weakened, new
+  relationshipNotes String? @map("relationship_notes") // personal details, rapport observations
+  topicsDiscussed   String  @default("[]") @map("topics_discussed") // JSON array of specific topics
 
   source            String  @default("manual")
   sourceIngestionId String? @map("source_ingestion_id")
@@ -368,6 +376,39 @@ model SchedulingLead {
   @@index([status])
   @@index([resolvedDate])
   @@map("scheduling_leads")
+}
+
+model LifeEvent {
+  id                String  @id @default(uuid())
+  contactId         String  @map("contact_id")
+  description       String
+  person            String  // who the event is about (the contact or someone in their life)
+  eventDate         String? @map("event_date")
+  recurring         Boolean @default(false) // birthdays, anniversaries
+  sourceIngestionId String? @map("source_ingestion_id")
+  createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([eventDate])
+  @@map("life_events")
+}
+
+model ReferencedResource {
+  id                String  @id @default(uuid())
+  contactId         String? @map("contact_id")
+  description       String
+  resourceType      String  @map("resource_type") // paper, article, podcast, document, book, other
+  url               String?
+  action            String  @default("reference_only") // they_will_send, i_should_read, i_will_send, reference_only
+  sourceIngestionId String? @map("source_ingestion_id")
+  createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("referenced_resources")
 }
 
 model ContactDossier {

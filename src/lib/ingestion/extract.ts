@@ -7,7 +7,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import type { IngestionExtraction, IngestionSource } from '@/types'
+import type { IngestionExtraction, IngestionSource, AudioFeatures } from '@/types'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -35,6 +35,7 @@ interface ExtractionContext {
       email?: string
     }
   }
+  audioFeatures?: AudioFeatures
 }
 
 function buildTemporalReference(): string[] {
@@ -251,6 +252,20 @@ ${context.metadata.forwardedFrom ? `Forwarded from: ${context.metadata.forwarded
 ${context.metadata.signature ? `Signature: ${JSON.stringify(context.metadata.signature)}` : ''}`
     : ''
 
+  const audioSection = context.audioFeatures
+    ? `## AUDIO ANALYSIS
+This voice recording was analyzed with audio signal processing. Use these features to ground your sentiment and relationship delta assessment in actual audio data:
+- Total duration: ${Math.floor(context.audioFeatures.totalDuration / 60)}m ${Math.floor(context.audioFeatures.totalDuration % 60)}s
+- Energy level: ${context.audioFeatures.averageEnergy}
+- Speaking pace: ${context.audioFeatures.overallPace}
+- Laughter instances: ${context.audioFeatures.laughterInstances}
+- Longest silence: ${context.audioFeatures.longestSilence.toFixed(1)}s
+- Average pitch: ${context.audioFeatures.averagePitch}Hz (variance: ${context.audioFeatures.pitchVariance}Hz)
+- Energy pattern: ${context.audioFeatures.energyPattern}
+
+Use these audio signals to inform your assessment of tone, energy, and conversation dynamics. High laughter + high energy typically indicates warm/enthusiastic sentiment. Long silences may indicate tension or contemplation. High pitch variance suggests animated discussion.`
+    : ''
+
   const userPrompt = `${contactProfile}
 
 ${historySection}
@@ -259,10 +274,12 @@ ${commitmentsSection}
 
 ${metadataSection}
 
+${audioSection}
+
 ## CONTENT (${sourceLabel(context.source)})
 ${content}
 
-Extract the full structured data now. Be thorough — capture everything of value.`
+Extract the full structured data now. Be thorough — capture everything of value.${context.audioFeatures ? ' Include observations about tone, energy, and conversation dynamics based on the audio analysis in your summary and relationshipNotes.' : ''}`
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',

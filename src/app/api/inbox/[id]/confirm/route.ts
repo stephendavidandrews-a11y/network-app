@@ -1,8 +1,21 @@
 /**
  * POST /api/inbox/[id]/confirm
  *
- * Confirms an ingestion item, writing all extracted data to the real database.
+ * Confirms an ingestion item, writing ALL extracted data to the real database.
  * Tracks a manifest of everything created for atomic undo.
+ *
+ * What gets stored on confirm:
+ * - Interaction record (with sentiment, topics, relationshipDelta, relationshipNotes)
+ * - Commitments (mine + theirs)
+ * - Intelligence signals (org intel + status changes)
+ * - Standing offers
+ * - Scheduling leads
+ * - Life events
+ * - Referenced resources
+ * - New contact stubs (tier 3)
+ * - Observed connections / relationships
+ * - Contact enrichment (title, org, phone, email from signature/extraction)
+ * - Dossier synthesis with full context (not just summary)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -33,7 +46,7 @@ export async function POST(
     const item = await prisma.ingestionItem.findUnique({
       where: { id },
       include: {
-        contact: { select: { id: true, name: true } },
+        contact: { select: { id: true, name: true, title: true, organization: true, email: true, phone: true } },
       },
     })
 
@@ -49,9 +62,23 @@ export async function POST(
     const manifest: ConfirmManifest = {}
     const now = new Date().toISOString()
 
-    // ── 1. Create Interaction (for interaction-type items) ──
-    if (extraction.itemType === 'interaction' && item.contactId) {
-      const interactionType = sourceToInteractionType(item.source)
+    // ── 1. Create Interaction ──
+    // An email, voice note, or iMessage IS an interaction regardless of Claude's classification.
+    // Only skip interaction creation for pure intelligence_signal items from non-direct sources
+    // and items classified as "irrelevant".
+    const shouldCreateInteraction = item.contactId && (
+      extraction.itemType !== 'irrelevant' && (
+        extraction.itemType === 'interaction' ||
+        extraction.itemType === 'scheduling' ||
+        item.source === 'email' ||
+        item.source === 'voice' ||
+        item.source === 'imessage_auto'
+      )
+    )
+
+    if (shouldCreateInteraction && item.contactId) {
+      const interactionType = resolveInteractionType(item.source, item.rawContent)
+      const interactionDate = resolveInteractionDate(item)
 
       // Build legacy commitments JSON for backward compat
       const legacyCommitments = extraction.myCommitments.map(c => ({
@@ -71,25 +98,24 @@ export async function POST(
         data: {
           contactId: item.contactId,
           type: interactionType,
-          date: item.createdAt.split('T')[0],
+          date: interactionDate,
           summary: extraction.summary,
           commitments: JSON.stringify(legacyCommitments),
           newContactsMentioned: JSON.stringify(newContactsMentioned),
           followUpRequired: extraction.asks.length > 0,
           followUpDescription: extraction.asks.length > 0
-            ? extraction.asks.map(a => a.description).join('; ')
+            ? extraction.asks.map(a => `[${a.direction === 'from_me' ? 'I asked' : 'They asked'}] ${a.description}`).join('; ')
             : null,
+          // Relationship intelligence fields
+          sentiment: extraction.sentiment,
+          relationshipDelta: extraction.relationshipDelta,
+          relationshipNotes: extraction.relationshipNotes || null,
+          topicsDiscussed: JSON.stringify(extraction.topicsDiscussed),
           source: item.source === 'voice' ? 'voice_debrief' : item.source === 'email' ? 'email_parsed' : 'system',
           sourceIngestionId: item.id,
         },
       })
       manifest.interactionId = interaction.id
-
-      // Update contact's lastInteractionDate
-      await prisma.contact.update({
-        where: { id: item.contactId },
-        data: { lastInteractionDate: interaction.date },
-      })
 
       // ── 2. Create Commitments ──
       const commitmentIds: string[] = []
@@ -123,27 +149,55 @@ export async function POST(
       }
     }
 
+    // ── 2b. Update lastInteractionDate and status ──
+    // Always update for any confirmed item with a contact (not just interaction-type)
+    if (item.contactId && extraction.itemType !== 'irrelevant') {
+      const interactionDate = resolveInteractionDate(item)
+      const currentContact = await prisma.contact.findUnique({
+        where: { id: item.contactId },
+        select: { status: true, lastInteractionDate: true },
+      })
+      if (currentContact) {
+        const contactUpdates: Record<string, string> = { lastInteractionDate: interactionDate }
+
+        // Auto-advance status on any real correspondence
+        const currentStatus = currentContact.status
+        if (currentStatus === 'target' || currentStatus === 'outreach_sent') {
+          contactUpdates.status = 'active'
+        }
+        if (currentStatus === 'cold' || currentStatus === 'dormant') {
+          contactUpdates.status = 'warm'
+        }
+
+        await prisma.contact.update({
+          where: { id: item.contactId },
+          data: contactUpdates,
+        })
+      }
+    }
+
     // ── 3. Create Intelligence Signals ──
-    if (extraction.orgIntelligence.length > 0 && item.contactId) {
+    if (item.contactId) {
       const signalIds: string[] = []
 
-      for (const intel of extraction.orgIntelligence) {
-        const signal = await prisma.intelligenceSignal.create({
-          data: {
-            contactId: item.contactId,
-            signalType: 'other',
-            title: `${intel.organization}: ${intel.intelligence.slice(0, 100)}`,
-            description: intel.intelligence,
-            sourceName: intel.source,
-            sourceIngestionId: item.id,
-          },
-        })
-        signalIds.push(signal.id)
+      if (extraction.orgIntelligence.length > 0) {
+        for (const intel of extraction.orgIntelligence) {
+          const signal = await prisma.intelligenceSignal.create({
+            data: {
+              contactId: item.contactId,
+              signalType: 'other',
+              title: `${intel.organization}: ${intel.intelligence.slice(0, 100)}`,
+              description: intel.intelligence,
+              sourceName: intel.source,
+              sourceIngestionId: item.id,
+            },
+          })
+          signalIds.push(signal.id)
+        }
       }
 
       // Status changes also create signals
       for (const sc of extraction.statusChanges) {
-        if (!item.contactId) continue
         const signal = await prisma.intelligenceSignal.create({
           data: {
             contactId: item.contactId,
@@ -201,14 +255,64 @@ export async function POST(
       manifest.schedulingLeadIds = leadIds
     }
 
-    // ── 6. Create New Contact Stubs ──
+    // ── 6. Create Life Events ──
+    if (extraction.lifeEvents.length > 0 && item.contactId) {
+      const lifeEventIds: string[] = []
+
+      for (const le of extraction.lifeEvents) {
+        if (!le.description || le.description.trim().length < 3) continue
+
+        const created = await prisma.lifeEvent.create({
+          data: {
+            contactId: item.contactId,
+            description: le.description,
+            person: le.person,
+            eventDate: le.date,
+            recurring: le.recurring,
+            sourceIngestionId: item.id,
+          },
+        })
+        lifeEventIds.push(created.id)
+      }
+
+      if (lifeEventIds.length > 0) {
+        manifest.lifeEventIds = lifeEventIds
+      }
+    }
+
+    // ── 7. Create Referenced Resources ──
+    if (extraction.referencedResources.length > 0) {
+      const resourceIds: string[] = []
+
+      for (const res of extraction.referencedResources) {
+        if (!res.description || res.description.trim().length < 3) continue
+
+        const created = await prisma.referencedResource.create({
+          data: {
+            contactId: item.contactId,
+            description: res.description,
+            resourceType: res.type,
+            url: res.url,
+            action: res.action,
+            sourceIngestionId: item.id,
+          },
+        })
+        resourceIds.push(created.id)
+      }
+
+      if (resourceIds.length > 0) {
+        manifest.referencedResourceIds = resourceIds
+      }
+    }
+
+    // ── 8. Create New Contact Stubs ──
     if (extraction.newContactsMentioned.length > 0) {
       const contactIds: string[] = []
 
       for (const nc of extraction.newContactsMentioned) {
         if (!nc.name || nc.name.trim().length < 2) continue
 
-        // Check if contact already exists
+        // Check if contact already exists (case-insensitive)
         const existing = await prisma.contact.findFirst({
           where: { name: { equals: nc.name } },
           select: { id: true },
@@ -236,7 +340,7 @@ export async function POST(
       }
     }
 
-    // ── 7. Create Observed Connections ──
+    // ── 9. Create Observed Connections ──
     if (extraction.observedConnections.length > 0) {
       const relationshipIds: string[] = []
 
@@ -301,6 +405,93 @@ export async function POST(
       }
     }
 
+    // ── 10. Contact Enrichment ──
+    // Update the primary contact with any new information from extraction
+    if (item.contactId && item.contact) {
+      const contactUpdates: Record<string, string> = {}
+      const fieldsUpdated: string[] = []
+
+      // Enrich from status changes (job changes, promotions)
+      for (const sc of extraction.statusChanges) {
+        if (sc.to) {
+          // If there's a "to" field, this might be a new title or org
+          if (sc.changeType === 'job_change' || sc.changeType === 'promotion') {
+            // Parse "to" — could be "Director at Treasury" or "New role"
+            const toMatch = sc.to.match(/^(.+?)\s+(?:at|@)\s+(.+)$/i)
+            if (toMatch) {
+              if (!item.contact.title || item.contact.title !== toMatch[1]) {
+                contactUpdates.title = toMatch[1].trim()
+                fieldsUpdated.push('title')
+              }
+              if (!item.contact.organization || item.contact.organization !== toMatch[2]) {
+                contactUpdates.organization = toMatch[2].trim()
+                fieldsUpdated.push('organization')
+              }
+            } else if (sc.changeType === 'promotion') {
+              // Just a title update
+              if (!item.contact.title || item.contact.title !== sc.to) {
+                contactUpdates.title = sc.to
+                fieldsUpdated.push('title')
+              }
+            }
+          }
+          if (sc.changeType === 'org_change') {
+            if (!item.contact.organization || item.contact.organization !== sc.to) {
+              contactUpdates.organization = sc.to
+              fieldsUpdated.push('organization')
+            }
+          }
+        }
+      }
+
+      // Enrich from email metadata if available (signature parsing happened during ingestion)
+      // The contact hint and raw content may contain enrichment data
+      if (item.rawContent) {
+        // Try to extract signature data from raw email
+        const phonePattern = /(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}/
+        const emailPattern = /[\w.+-]+@[\w.-]+\.\w{2,}/
+
+        // Only enrich if the contact is missing these fields
+        if (!item.contact.phone) {
+          // Look for phone in the raw content (signature area)
+          const lines = item.rawContent.split('\n')
+          const lastLines = lines.slice(-15) // Signature is usually at the end
+          for (const line of lastLines) {
+            const phoneMatch = line.match(phonePattern)
+            if (phoneMatch) {
+              contactUpdates.phone = phoneMatch[0]
+              fieldsUpdated.push('phone')
+              break
+            }
+          }
+        }
+
+        if (!item.contact.email && item.source === 'email') {
+          // Try to get email from the raw content
+          const lines = item.rawContent.split('\n')
+          const lastLines = lines.slice(-15)
+          for (const line of lastLines) {
+            const emailMatch = line.match(emailPattern)
+            if (emailMatch && !emailMatch[0].includes('stephenandrews')) {
+              contactUpdates.email = emailMatch[0]
+              fieldsUpdated.push('email')
+              break
+            }
+          }
+        }
+      }
+
+      // Apply contact updates if any
+      if (Object.keys(contactUpdates).length > 0) {
+        await prisma.contact.update({
+          where: { id: item.contactId },
+          data: contactUpdates,
+        })
+        manifest.contactFieldsUpdated = fieldsUpdated
+        console.log(`[Inbox] Enriched contact ${item.contact.name}: ${fieldsUpdated.join(', ')}`)
+      }
+    }
+
     // ── Update Item Status ──
     const finalStatus = editedExtraction ? 'edited' : 'confirmed'
     await prisma.ingestionItem.update({
@@ -324,10 +515,11 @@ export async function POST(
 
     console.log(`[Inbox] Confirmed item ${id} | manifest: ${JSON.stringify(manifest)}`)
 
-    // Trigger incremental dossier update (fire-and-forget)
+    // ── Trigger Dossier Update with Full Context ──
     if (item.contactId) {
-      const summaryContext = extraction.summary || ''
-      synthesizeDossier(item.contactId, 'incremental', summaryContext).catch(err => {
+      // Build rich context for dossier — not just the summary, but everything we extracted
+      const dossierContext = buildDossierContext(extraction)
+      synthesizeDossier(item.contactId, 'incremental', dossierContext).catch(err => {
         console.error(`[Dossier] Incremental update failed for contact ${item.contactId}:`, err)
       })
     }
@@ -344,14 +536,124 @@ export async function POST(
   }
 }
 
-function sourceToInteractionType(source: string): string {
+/**
+ * Build a rich context string for dossier synthesis from the full extraction.
+ * Instead of just passing the summary, we pass everything that's relationally meaningful.
+ */
+function buildDossierContext(extraction: IngestionExtraction): string {
+  const parts: string[] = []
+
+  // Summary
+  parts.push(`## New Interaction Summary\n${extraction.summary}`)
+
+  // Sentiment & relationship
+  if (extraction.sentiment && extraction.sentiment !== 'neutral') {
+    parts.push(`Interaction tone: ${extraction.sentiment}`)
+  }
+  if (extraction.relationshipDelta && extraction.relationshipDelta !== 'maintained') {
+    parts.push(`Relationship trajectory: ${extraction.relationshipDelta}`)
+  }
+  if (extraction.relationshipNotes) {
+    parts.push(`Relationship observations: ${extraction.relationshipNotes}`)
+  }
+
+  // Topics
+  if (extraction.topicsDiscussed.length > 0) {
+    parts.push(`Topics discussed: ${extraction.topicsDiscussed.join(', ')}`)
+  }
+
+  // Commitments
+  if (extraction.myCommitments.length > 0) {
+    parts.push(`My new commitments: ${extraction.myCommitments.map(c => c.description).join('; ')}`)
+  }
+  if (extraction.theirCommitments.length > 0) {
+    parts.push(`Their new commitments: ${extraction.theirCommitments.map(c => c.description).join('; ')}`)
+  }
+
+  // Offers
+  if (extraction.offers.length > 0) {
+    parts.push(`Standing offers: ${extraction.offers.map(o => `${o.offeredBy === 'me' ? 'I offered' : 'They offered'}: ${o.description}`).join('; ')}`)
+  }
+
+  // Life events
+  if (extraction.lifeEvents.length > 0) {
+    parts.push(`Life events mentioned: ${extraction.lifeEvents.map(le => le.description).join('; ')}`)
+  }
+
+  // Org intelligence
+  if (extraction.orgIntelligence.length > 0) {
+    parts.push(`Org intel: ${extraction.orgIntelligence.map(o => `${o.organization}: ${o.intelligence}`).join('; ')}`)
+  }
+
+  // Status changes
+  if (extraction.statusChanges.length > 0) {
+    parts.push(`Status changes: ${extraction.statusChanges.map(sc => sc.description).join('; ')}`)
+  }
+
+  // New contacts mentioned
+  if (extraction.newContactsMentioned.length > 0) {
+    parts.push(`New people mentioned: ${extraction.newContactsMentioned.map(nc => `${nc.name}${nc.org ? ` (${nc.org})` : ''} — ${nc.context}`).join('; ')}`)
+  }
+
+  // Scheduling
+  if (extraction.schedulingLeads.length > 0) {
+    parts.push(`Scheduling: ${extraction.schedulingLeads.map(s => s.description).join('; ')}`)
+  }
+
+  return parts.join('\n\n')
+}
+
+/**
+ * Determine the interaction type based on source and content.
+ * For emails: distinguish sent vs received by checking if Stephen is the sender.
+ * For voice: always a meeting/call debrief.
+ */
+function resolveInteractionType(source: string, rawContent: string): string {
   switch (source) {
-    case 'email': return 'email_received'
+    case 'email': {
+      // Check if Stephen sent this email (it's in the "To" field of a forwarded message,
+      // or the From contains stephenandrews)
+      const fromMatch = rawContent.match(/From:\s*(.+)/i)
+      if (fromMatch) {
+        const from = fromMatch[1].toLowerCase()
+        if (from.includes('stephenandrews') || from.includes('stephen andrews') || from.includes('stephen.andrews')) {
+          return 'email_sent'
+        }
+      }
+      return 'email_received'
+    }
     case 'imessage_auto': return 'text_message'
-    case 'voice': return 'meeting'
+    case 'voice': return 'meeting'  // Voice memos are debriefs of meetings/calls
     case 'ios_shortcut': return 'other'
     case 'signal_forward': return 'other'
     case 'manual': return 'other'
     default: return 'other'
   }
+}
+
+/**
+ * Extract the actual date of the interaction from metadata.
+ * For emails: try to find the Date header from the original email.
+ * For everything else: use the ingestion item's creation timestamp.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveInteractionDate(item: any): string {
+  // Try to extract date from the raw email content (Date: header)
+  if (item.source === 'email' && item.rawContent) {
+    const dateMatch = item.rawContent.match(/Date:\s*(.+)/i)
+    if (dateMatch) {
+      try {
+        const parsed = new Date(dateMatch[1].trim())
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().split('T')[0]
+        }
+      } catch {
+        // Fall through to default
+      }
+    }
+  }
+
+  // Default: use the ingestion item's createdAt
+  const createdAt = typeof item.createdAt === 'string' ? item.createdAt : item.createdAt.toISOString()
+  return createdAt.split('T')[0]
 }

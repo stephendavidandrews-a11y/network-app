@@ -73,6 +73,10 @@ export async function synthesizeDossier(
       followUpRequired: true,
       followUpDescription: true,
       followUpCompleted: true,
+      sentiment: true,
+      relationshipDelta: true,
+      relationshipNotes: true,
+      topicsDiscussed: true,
     },
   })
 
@@ -123,6 +127,31 @@ export async function synthesizeDossier(
       timeframe: true,
       status: true,
       createdAt: true,
+    },
+  })
+
+  // Fetch life events
+  const lifeEvents = await prisma.lifeEvent.findMany({
+    where: { contactId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      description: true,
+      person: true,
+      eventDate: true,
+      recurring: true,
+    },
+  })
+
+  // Fetch referenced resources
+  const resources = await prisma.referencedResource.findMany({
+    where: { contactId },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    select: {
+      description: true,
+      resourceType: true,
+      url: true,
+      action: true,
     },
   })
 
@@ -201,9 +230,16 @@ Target cadence: every ${contact.targetCadenceDays} days`.trim()
 
   const interactionSection = interactions.length > 0
     ? `## INTERACTION HISTORY (${interactions.length} most recent)
-${interactions.map(i =>
-  `- [${i.date}] ${i.type.replace(/_/g, ' ')}: ${i.summary || 'No summary'}${i.followUpRequired && !i.followUpCompleted ? ' [FOLLOW-UP NEEDED]' : ''}`
-).join('\n')}`
+${interactions.map(i => {
+  let line = `- [${i.date}] ${i.type.replace(/_/g, ' ')}: ${i.summary || 'No summary'}`
+  if (i.sentiment && i.sentiment !== 'neutral') line += ` [tone: ${i.sentiment}]`
+  if (i.relationshipDelta && i.relationshipDelta !== 'maintained') line += ` [relationship: ${i.relationshipDelta}]`
+  if (i.followUpRequired && !i.followUpCompleted) line += ' [FOLLOW-UP NEEDED]'
+  const topics = i.topicsDiscussed ? JSON.parse(i.topicsDiscussed) : []
+  if (topics.length > 0) line += `\n  Topics: ${topics.join(', ')}`
+  if (i.relationshipNotes) line += `\n  Notes: ${i.relationshipNotes}`
+  return line
+}).join('\n')}`
     : '## INTERACTION HISTORY\nNo interactions logged.'
 
   const commitmentSection = commitments.length > 0
@@ -234,6 +270,20 @@ ${offers.map(o =>
     ? `## SCHEDULING LEADS
 ${schedulingLeads.map(s =>
   `- ${s.description}${s.timeframe ? ` (${s.timeframe})` : ''} [${s.status}]`
+).join('\n')}`
+    : ''
+
+  const lifeEventSection = lifeEvents.length > 0
+    ? `## LIFE EVENTS & PERSONAL MILESTONES
+${lifeEvents.map(le =>
+  `- ${le.description} (${le.person})${le.eventDate ? ` — ${le.eventDate}` : ''}${le.recurring ? ' [recurring]' : ''}`
+).join('\n')}`
+    : ''
+
+  const resourceSection = resources.length > 0
+    ? `## REFERENCED RESOURCES
+${resources.map(r =>
+  `- [${r.resourceType}] ${r.description}${r.url ? ` (${r.url})` : ''}${r.action !== 'reference_only' ? ` [${r.action.replace(/_/g, ' ')}]` : ''}`
 ).join('\n')}`
     : ''
 
@@ -278,6 +328,10 @@ ${offerSection}
 
 ${scheduleSection}
 
+${lifeEventSection}
+
+${resourceSection}
+
 ${networkSection}
 
 Update the dossier. Maintain the same sections but integrate any new information. If nothing has changed, return the existing dossier unchanged.`
@@ -293,11 +347,13 @@ Write a living intelligence document that captures everything Stephen needs to k
 
 Structure:
 - **Profile & Context**: Who they are and why they matter to Stephen
-- **Relationship Summary**: Current state of the relationship, trajectory, dynamics
+- **Relationship Summary**: Current state of the relationship, trajectory, dynamics. Include sentiment patterns across interactions.
 - **Key Intelligence**: What Stephen knows that's strategically valuable
 - **Open Items**: Unfulfilled commitments, pending asks, scheduling leads
 - **Standing Offers & Leverage Points**: Resources available through this relationship
+- **Personal Notes**: Life events, family milestones, personal details that build rapport
 - **Network Position**: How this person connects to others in Stephen's network
+- **Resources & References**: Papers, articles, documents discussed or shared
 - **Action Items & Recommendations**: What Stephen should do next
 
 Write in second person ("You met Jerry at..."). Be substantive and specific — this is a strategic document, not a contact card.
@@ -315,6 +371,10 @@ ${signalSection}
 ${offerSection}
 
 ${scheduleSection}
+
+${lifeEventSection}
+
+${resourceSection}
 
 ${networkSection}
 

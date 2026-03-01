@@ -329,6 +329,9 @@ export interface IngestionExtraction {
 
   // Status Changes
   statusChanges: StatusChangeExtraction[]
+
+  // Audio analysis (when source is voice)
+  audioFeatures?: AudioFeatures
 }
 
 export interface IngestionCommitment {
@@ -448,10 +451,13 @@ export interface ConfirmManifest {
   signalIds?: string[]
   standingOfferIds?: string[]
   schedulingLeadIds?: string[]
-  contactIds?: string[]       // new contacts created
-  relationshipIds?: string[]  // observed connections
+  contactIds?: string[]            // new contacts created
+  relationshipIds?: string[]       // observed connections
+  lifeEventIds?: string[]          // life events recorded
+  referencedResourceIds?: string[] // resources mentioned
+  contactFieldsUpdated?: string[]  // which contact fields were enriched
   dossierVersion?: number
-  calendarEventIds?: string[] // Google Calendar events created
+  calendarEventIds?: string[]      // Google Calendar events created
 }
 
 export interface StandingOfferRecord {
@@ -537,6 +543,20 @@ export interface InboxStats {
   dismissed: number
   autoHandled: number
   todayPending: number
+}
+
+// ── Audio Features Types ──
+
+export interface AudioFeatures {
+  totalDuration: number          // seconds
+  averageEnergy: 'low' | 'medium' | 'high'
+  overallPace: 'slow' | 'moderate' | 'fast'
+  laughterInstances: number
+  longestSilence: number         // seconds
+  averagePitch: number           // Hz
+  pitchVariance: number          // Hz
+  energyPattern: string          // e.g. "high energy throughout, slight dip at 3:00 mark"
+  // Speaker-level profiles added later with pyannote on Mac Mini
 }
 
 // ── Voice Debrief Types ──

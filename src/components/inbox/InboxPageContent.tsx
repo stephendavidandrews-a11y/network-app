@@ -431,7 +431,7 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
     }`}>
       {/* Header Row */}
       <div className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-t-lg" onClick={onToggle}>
-        <SourceIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <SourceIcon className={`w-4 h-4 flex-shrink-0 ${item.source === 'voice' ? 'text-violet-500' : 'text-gray-400'}`} />
 
         {/* Type Badge */}
         <span className={`px-2 py-0.5 rounded text-xs font-medium border ${TYPE_COLORS[item.itemType] || TYPE_COLORS.interaction}`}>
@@ -510,6 +510,34 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
               )}
             </div>
           </div>
+
+          {/* Audio Features (voice items) */}
+          {item.source === 'voice' && ext.audioFeatures && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              <span className="px-2 py-1 rounded-md text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">
+                {Math.floor(ext.audioFeatures.totalDuration / 60)}m {Math.floor(ext.audioFeatures.totalDuration % 60)}s
+              </span>
+              <span className={`px-2 py-1 rounded-md text-xs font-medium border ${
+                ext.audioFeatures.averageEnergy === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                ext.audioFeatures.averageEnergy === 'medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                'bg-gray-50 text-gray-600 border-gray-200'
+              }`}>
+                {ext.audioFeatures.averageEnergy} energy
+              </span>
+              <span className={`px-2 py-1 rounded-md text-xs font-medium border ${
+                ext.audioFeatures.overallPace === 'fast' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                ext.audioFeatures.overallPace === 'moderate' ? 'bg-gray-50 text-gray-600 border-gray-200' :
+                'bg-green-50 text-green-700 border-green-200'
+              }`}>
+                {ext.audioFeatures.overallPace} pace
+              </span>
+              {ext.audioFeatures.laughterInstances > 0 && (
+                <span className="px-2 py-1 rounded-md text-xs font-medium bg-pink-50 text-pink-700 border border-pink-200">
+                  {ext.audioFeatures.laughterInstances} laugh{ext.audioFeatures.laughterInstances !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Extraction Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -13,6 +13,7 @@ import {
   CheckSquare,
   Database,
   Inbox,
+  Mic,
   Settings,
   LogOut,
 } from 'lucide-react'
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Inbox', href: '/inbox', icon: Inbox },
+  { name: 'Upload', href: '/upload', icon: Mic },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Interactions', href: '/interactions', icon: MessageSquare },
   { name: 'Outreach', href: '/outreach', icon: Send },
