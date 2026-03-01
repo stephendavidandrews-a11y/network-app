@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils'
 import { TIER_COLORS, TIER_LABELS, STATUS_COLORS, STATUS_LABELS } from '@/lib/constants'
 import { formatDate, formatRelativeDate } from '@/lib/utils'
+import { CommitmentActions } from '@/components/commitments/CommitmentActions'
 
 interface Props {
   contact: {
@@ -92,6 +93,18 @@ interface Props {
     organization: string | null
     tier: number
   }>
+  commitments: Array<{
+    id: string
+    interactionId: string
+    contactId: string
+    description: string
+    dueDate: string | null
+    fulfilled: boolean
+    fulfilledDate: string | null
+    fulfilledNotes: string | null
+    reminderSnoozedUntil: string | null
+    createdAt: string
+  }>
   latestPrep: {
     id: string
     briefContent: string
@@ -100,14 +113,11 @@ interface Props {
   } | null
 }
 
-export function ContactDetailContent({ contact, relationships, relatedContacts, latestPrep }: Props) {
+export function ContactDetailContent({ contact, relationships, relatedContacts, commitments, latestPrep }: Props) {
   const router = useRouter()
 
-  const openCommitments = contact.interactions
-    .flatMap(i => i.commitments.filter(c => !c.fulfilled).map(c => ({
-      ...c,
-      interactionDate: i.date,
-    })))
+  const openCommitments = commitments.filter(c => !c.fulfilled)
+  const fulfilledCommitments = commitments.filter(c => c.fulfilled)
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -192,18 +202,58 @@ export function ContactDetailContent({ contact, relationships, relatedContacts, 
             </div>
           )}
 
-          {/* Open Commitments */}
-          {openCommitments.length > 0 && (
+          {/* Commitments */}
+          {commitments.length > 0 && (
             <div className="rounded-lg border bg-white p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Open Commitments</h3>
-              <div className="space-y-2">
-                {openCommitments.map((c, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700">{c.description}</span>
-                    <span className="text-xs text-gray-400">{c.due_date ? `Due ${formatDate(c.due_date)}` : `From ${formatDate(c.interactionDate)}`}</span>
-                  </div>
-                ))}
-              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                Commitments
+                {openCommitments.length > 0 && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    {openCommitments.length} open
+                  </span>
+                )}
+              </h3>
+
+              {/* Open commitments with actions */}
+              {openCommitments.length > 0 && (
+                <div className="space-y-3 mb-4">
+                  {openCommitments.map(c => (
+                    <div key={c.id} className="border-l-2 border-amber-300 pl-3 py-1">
+                      <div className="flex items-start justify-between">
+                        <p className="text-sm text-gray-700">{c.description}</p>
+                        {c.dueDate && (
+                          <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                            Due {formatDate(c.dueDate)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5">
+                        <CommitmentActions
+                          commitmentId={c.id}
+                          contactName={contact.name}
+                          description={c.description}
+                          compact
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Fulfilled commitments */}
+              {fulfilledCommitments.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase">Fulfilled</p>
+                  {fulfilledCommitments.slice(0, 5).map(c => (
+                    <div key={c.id} className="flex items-center justify-between text-sm text-gray-400">
+                      <span className="line-through">{c.description}</span>
+                      {c.fulfilledDate && (
+                        <span className="text-xs ml-2 whitespace-nowrap">{formatDate(c.fulfilledDate)}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

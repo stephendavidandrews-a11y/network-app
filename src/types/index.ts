@@ -207,6 +207,29 @@ export interface MeetingPrepRecord {
   generatedAt: string
 }
 
+// ── Commitment Types ──
+
+export type CommitmentUrgency = 'overdue' | 'today' | 'this_week' | 'upcoming'
+
+export interface CommitmentRecord {
+  id: string
+  interactionId: string
+  contactId: string
+  description: string
+  dueDate: string | null
+  fulfilled: boolean
+  fulfilledDate: string | null
+  fulfilledNotes: string | null
+  reminderSnoozedUntil: string | null
+  createdAt: string
+  // Enriched fields (computed at query time)
+  contactName?: string
+  contactOrg?: string | null
+  interactionDate?: string
+  daysOverdue?: number | null
+  urgency?: CommitmentUrgency
+}
+
 // ── Voice Debrief Types ──
 
 export interface DebriefExtraction {

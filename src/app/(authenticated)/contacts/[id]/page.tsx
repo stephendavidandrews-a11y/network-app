@@ -47,6 +47,12 @@ export default async function ContactDetailPage({
       })
     : []
 
+  // Fetch commitments for this contact from dedicated table
+  const commitmentRows = await prisma.commitment.findMany({
+    where: { contactId: params.id },
+    orderBy: [{ fulfilled: 'asc' }, { dueDate: 'asc' }],
+  })
+
   // Fetch most recent meeting prep for this contact (today or yesterday)
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   const latestPrep = await prisma.meetingPrep.findFirst({
@@ -79,6 +85,18 @@ export default async function ContactDetailPage({
       contact={enriched}
       relationships={relationships}
       relatedContacts={relatedContacts}
+      commitments={commitmentRows.map(c => ({
+        id: c.id,
+        interactionId: c.interactionId,
+        contactId: c.contactId,
+        description: c.description,
+        dueDate: c.dueDate,
+        fulfilled: c.fulfilled,
+        fulfilledDate: c.fulfilledDate,
+        fulfilledNotes: c.fulfilledNotes,
+        reminderSnoozedUntil: c.reminderSnoozedUntil,
+        createdAt: c.createdAt,
+      }))}
       latestPrep={latestPrep ? {
         id: latestPrep.id,
         briefContent: latestPrep.briefContent,

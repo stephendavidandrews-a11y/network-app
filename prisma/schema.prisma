@@ -45,6 +45,7 @@ model Contact {
   relationshipsAsA        ContactRelationship[] @relation("ContactA")
   relationshipsAsB        ContactRelationship[] @relation("ContactB")
   meetingPreps            MeetingPrep[]
+  commitmentRecords       Commitment[]
 
   @@index([tier])
   @@index([status])
@@ -71,6 +72,7 @@ model Interaction {
   createdAt             String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contact               Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  commitmentRecords     Commitment[]
 
   @@index([contactId, date(sort: Desc)])
   @@map("interactions")
@@ -222,4 +224,24 @@ model CalendarCache {
   fetchedAt    String @default(dbgenerated("(datetime('now'))")) @map("fetched_at")
 
   @@map("calendar_cache")
+}
+
+model Commitment {
+  id                   String   @id @default(uuid())
+  interactionId        String   @map("interaction_id")
+  contactId            String   @map("contact_id")
+  description          String
+  dueDate              String?  @map("due_date")
+  fulfilled            Boolean  @default(false)
+  fulfilledDate        String?  @map("fulfilled_date")
+  fulfilledNotes       String?  @map("fulfilled_notes")
+  reminderSnoozedUntil String?  @map("reminder_snoozed_until")
+  createdAt            String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  interaction          Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  contact              Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([fulfilled, dueDate])
+  @@map("commitments")
 }

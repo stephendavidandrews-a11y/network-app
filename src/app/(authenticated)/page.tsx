@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { DashboardContent } from '@/components/dashboard/DashboardContent'
 import { classifyCalendarLoad } from '@/lib/calendar'
-import type { CalendarMeeting, CalendarLoad, MeetingPrepRecord } from '@/types'
+import type { CalendarMeeting, CalendarLoad, MeetingPrepRecord, CommitmentUrgency } from '@/types'
 
 async function getDashboardData() {
   const today = new Date().toISOString().split('T')[0]
@@ -30,44 +30,50 @@ async function getDashboardData() {
     include: { contact: true },
   })
 
-  // Open commitments from interactions
-  const interactionsWithCommitments = await prisma.interaction.findMany({
+  // Open commitments from dedicated table
+  const commitmentRows = await prisma.commitment.findMany({
     where: {
-      commitments: { not: '[]' },
+      fulfilled: false,
+      OR: [
+        { reminderSnoozedUntil: null },
+        { reminderSnoozedUntil: { lt: today } },
+      ],
     },
-    include: { contact: true },
-    orderBy: { date: 'desc' },
+    include: {
+      contact: { select: { name: true, organization: true } },
+      interaction: { select: { date: true } },
+    },
+    orderBy: { dueDate: 'asc' },
   })
 
-  const openCommitments: Array<{
-    description: string
-    dueDate: string | null
-    contactName: string
-    contactId: string
-    interactionDate: string
-    daysOverdue: number | null
-  }> = []
+  const openCommitments = commitmentRows.map(c => {
+    const daysOverdue = c.dueDate
+      ? Math.floor((Date.now() - new Date(c.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+      : null
 
-  for (const interaction of interactionsWithCommitments) {
-    try {
-      const commitments = JSON.parse(interaction.commitments)
-      for (const c of commitments) {
-        if (!c.fulfilled) {
-          const daysOverdue = c.due_date
-            ? Math.floor((Date.now() - new Date(c.due_date).getTime()) / (1000 * 60 * 60 * 24))
-            : null
-          openCommitments.push({
-            description: c.description,
-            dueDate: c.due_date,
-            contactName: interaction.contact.name,
-            contactId: interaction.contactId,
-            interactionDate: interaction.date,
-            daysOverdue: daysOverdue && daysOverdue > 0 ? daysOverdue : null,
-          })
-        }
+    let urgency: CommitmentUrgency = 'upcoming'
+    if (c.dueDate) {
+      if (c.dueDate < today) urgency = 'overdue'
+      else if (c.dueDate === today) urgency = 'today'
+      else {
+        const daysUntil = Math.floor(
+          (new Date(c.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        )
+        if (daysUntil <= 7) urgency = 'this_week'
       }
-    } catch { /* skip invalid JSON */ }
-  }
+    }
+
+    return {
+      id: c.id,
+      description: c.description,
+      dueDate: c.dueDate,
+      contactName: c.contact?.name || 'Unknown',
+      contactId: c.contactId,
+      interactionDate: c.interaction?.date || '',
+      daysOverdue: daysOverdue && daysOverdue > 0 ? daysOverdue : null,
+      urgency,
+    }
+  })
 
   const upcomingEvents = await prisma.event.findMany({
     where: {

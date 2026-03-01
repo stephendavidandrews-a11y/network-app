@@ -18,6 +18,8 @@ import { TIER_COLORS, STATUS_COLORS } from '@/lib/constants'
 import { formatRelativeDate, formatDate } from '@/lib/utils'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { MeetingPrepCard } from './MeetingPrepCard'
+import { CommitmentActions } from '@/components/commitments/CommitmentActions'
+import type { CommitmentUrgency } from '@/types'
 
 interface DashboardProps {
   data: {
@@ -77,12 +79,14 @@ interface DashboardProps {
       status: string
     }>
     openCommitments: Array<{
+      id: string
       description: string
       dueDate: string | null
       contactName: string
       contactId: string
       interactionDate: string
       daysOverdue: number | null
+      urgency: CommitmentUrgency
     }>
     upcomingEvents: Array<{
       id: string
@@ -349,23 +353,40 @@ export function DashboardContent({ data }: DashboardProps) {
             <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">No open commitments</div>
           ) : (
             <div className="rounded-lg border bg-white divide-y">
-              {data.openCommitments.slice(0, 5).map((commitment, i) => (
-                <div key={i} className="p-3">
+              {data.openCommitments.slice(0, 5).map((commitment) => (
+                <div key={commitment.id} className="p-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900">{commitment.description}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-900">{commitment.description}</p>
+                        <span className={cn(
+                          'rounded px-1.5 py-0.5 text-xs font-medium whitespace-nowrap',
+                          commitment.urgency === 'overdue' ? 'bg-red-50 text-red-600' :
+                          commitment.urgency === 'today' ? 'bg-amber-50 text-amber-600' :
+                          commitment.urgency === 'this_week' ? 'bg-blue-50 text-blue-600' :
+                          'bg-gray-50 text-gray-500'
+                        )}>
+                          {commitment.daysOverdue && commitment.daysOverdue > 0
+                            ? `${commitment.daysOverdue}d overdue`
+                            : commitment.urgency === 'today' ? 'Today'
+                            : commitment.dueDate ? `Due ${formatDate(commitment.dueDate)}`
+                            : 'No date'}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                         <Link href={`/contacts/${commitment.contactId}`} className="hover:text-blue-600">
                           {commitment.contactName}
                         </Link>
-                        {commitment.dueDate && <span>Due {formatDate(commitment.dueDate)}</span>}
                       </div>
                     </div>
-                    {commitment.daysOverdue && (
-                      <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600">
-                        {commitment.daysOverdue}d overdue
-                      </span>
-                    )}
+                  </div>
+                  <div className="mt-2">
+                    <CommitmentActions
+                      commitmentId={commitment.id}
+                      contactName={commitment.contactName}
+                      description={commitment.description}
+                      compact
+                    />
                   </div>
                 </div>
               ))}

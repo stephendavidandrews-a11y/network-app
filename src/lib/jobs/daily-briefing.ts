@@ -35,29 +35,29 @@ export async function generateDailyBriefing(prisma: PrismaClient): Promise<Brief
     .sort((a, b) => a.tier - b.tier || b.daysOverdue - a.daysOverdue)
     .slice(0, 15)
 
-  // Open commitments
-  const interactions = await prisma.interaction.findMany({
-    where: { commitments: { not: '[]' } },
+  // Open commitments from dedicated table
+  const commitmentRows = await prisma.commitment.findMany({
+    where: {
+      fulfilled: false,
+      OR: [
+        { reminderSnoozedUntil: null },
+        { reminderSnoozedUntil: { lt: today } },
+      ],
+    },
     include: { contact: { select: { name: true } } },
-    orderBy: { date: 'desc' },
-    take: 100,
+    orderBy: { dueDate: 'asc' },
   })
 
-  const openCommitments: BriefingContent['openCommitments'] = []
-  for (const interaction of interactions) {
-    let commitments: Array<{ description: string; due_date: string | null; fulfilled: boolean }> = []
-    try { commitments = JSON.parse(interaction.commitments || '[]') } catch { continue }
-    for (const c of commitments) {
-      if (c.fulfilled) continue
-      const daysOverdue = c.due_date ? (daysSince(c.due_date) || 0) : 0
-      openCommitments.push({
-        description: c.description,
-        contactName: interaction.contact?.name || 'Unknown',
-        daysOverdue: Math.max(0, daysOverdue),
-      })
-    }
-  }
-  openCommitments.sort((a, b) => b.daysOverdue - a.daysOverdue)
+  const openCommitments: BriefingContent['openCommitments'] = commitmentRows
+    .map(c => ({
+      description: c.description,
+      contactName: c.contact?.name || 'Unknown',
+      daysOverdue: Math.max(0, c.dueDate ? (daysSince(c.dueDate) || 0) : 0),
+    }))
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)
+
+  // Escalation: flag commitments 7+ days overdue
+  const escalatedCount = openCommitments.filter(c => c.daysOverdue >= 7).length
 
   // Outreach queue
   const queue = await prisma.outreachQueue.findMany({

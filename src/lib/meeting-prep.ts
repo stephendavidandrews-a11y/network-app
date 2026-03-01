@@ -74,35 +74,28 @@ export async function assembleContactContext(
 
   if (!contact) throw new Error(`Contact not found: ${contactId}`)
 
-  // Extract unfulfilled commitments from all interactions with this contact
-  const allInteractions = await prisma.interaction.findMany({
-    where: { contactId },
-    orderBy: { date: 'desc' },
-    take: 20,
+  // Fetch unfulfilled commitments from dedicated Commitment table
+  const today = new Date()
+  const commitmentRows = await prisma.commitment.findMany({
+    where: { contactId, fulfilled: false },
+    orderBy: { dueDate: 'asc' },
   })
 
-  const today = new Date()
-  const unfulfilledCommitments: PrepContext['unfulfilledCommitments'] = []
-  for (const interaction of allInteractions) {
-    try {
-      const commitments = JSON.parse(interaction.commitments || '[]')
-      for (const c of commitments) {
-        if (!c.fulfilled) {
-          let daysOverdue: number | null = null
-          if (c.due_date) {
-            const due = new Date(c.due_date)
-            daysOverdue = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
-          }
-          unfulfilledCommitments.push({
-            description: c.description,
-            dueDate: c.due_date || null,
-            daysOverdue,
-            contactName: contact.name,
-          })
-        }
-      }
-    } catch { /* ignore bad JSON */ }
-  }
+  const unfulfilledCommitments: PrepContext['unfulfilledCommitments'] = commitmentRows.map(c => {
+    let daysOverdue: number | null = null
+    if (c.dueDate) {
+      daysOverdue = Math.floor(
+        (today.getTime() - new Date(c.dueDate).getTime()) / (1000 * 60 * 60 * 24)
+      )
+      if (daysOverdue < 0) daysOverdue = null
+    }
+    return {
+      description: c.description,
+      dueDate: c.dueDate,
+      daysOverdue,
+      contactName: contact.name,
+    }
+  })
 
   // Find shared events (events where this contact is attending or speaking)
   const upcomingEvents = await prisma.event.findMany({
