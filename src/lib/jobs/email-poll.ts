@@ -280,12 +280,16 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
 
           // Decode base64 MIME body parts if present
           // Outlook/Apple Mail forwarded emails often have base64-encoded text/plain parts
-          const base64Match = textContent.match(/Content-Transfer-Encoding:\s*base64\s*\r?\n\r?\n([A-Za-z0-9+/=\s]+)/i)
+          // Match base64 block until MIME boundary (--_xxx) or next Content-Type header
+          const base64Match = textContent.match(/Content-Transfer-Encoding:\s*base64\s+([A-Za-z0-9+/=\r\n\s]+?)(?=\s*--[_A-Za-z0-9]|\s*Content-Type:|\s*$)/i)
           if (base64Match) {
             try {
-              const decoded = Buffer.from(base64Match[1].replace(/\s/g, ''), 'base64').toString('utf-8')
-              // Replace the base64 block with decoded text
-              textContent = textContent.substring(0, base64Match.index || 0) + decoded + textContent.substring((base64Match.index || 0) + base64Match[0].length)
+              const b64Data = base64Match[1].replace(/\s/g, '')
+              if (b64Data.length > 10) {
+                const decoded = Buffer.from(b64Data, 'base64').toString('utf-8')
+                // Replace the base64 block with decoded text
+                textContent = textContent.substring(0, base64Match.index || 0) + decoded + textContent.substring((base64Match.index || 0) + base64Match[0].length)
+              }
             } catch {
               // If decode fails, continue with raw content
             }

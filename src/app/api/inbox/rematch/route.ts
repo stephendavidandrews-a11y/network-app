@@ -138,11 +138,16 @@ export async function POST() {
       let rawContent = item.rawContent || ''
 
       // Decode base64 MIME body if present (Outlook/Apple Mail forwards)
-      const base64Match = rawContent.match(/Content-Transfer-Encoding:\s*base64\s*\r?\n\r?\n([A-Za-z0-9+/=\s]+)/i)
+      // Raw content may have original newlines OR whitespace-collapsed to spaces.
+      // Stop at MIME boundary (--_xxx) or next Content-Type header.
+      const base64Match = rawContent.match(/Content-Transfer-Encoding:\s*base64[\s\n]+([A-Za-z0-9+/=\s]+?)(?=\s+--[_A-Za-z0-9]|\s+Content-Type:|\s*$)/i)
       if (base64Match) {
         try {
-          const decoded = Buffer.from(base64Match[1].replace(/\s/g, ''), 'base64').toString('utf-8')
-          rawContent = rawContent.substring(0, base64Match.index || 0) + decoded + rawContent.substring((base64Match.index || 0) + base64Match[0].length)
+          const b64Data = base64Match[1].replace(/\s/g, '')
+          if (b64Data.length > 10) {
+            const decoded = Buffer.from(b64Data, 'base64').toString('utf-8')
+            rawContent = rawContent.substring(0, base64Match.index || 0) + decoded + rawContent.substring((base64Match.index || 0) + base64Match[0].length)
+          }
         } catch {
           // If decode fails, continue with raw content
         }
