@@ -232,11 +232,22 @@ export interface CommitmentRecord {
 
 // ── Voice Debrief Types ──
 
+export interface DebriefCommitment {
+  description: string
+  originalWords: string
+  resolvedDate: string | null
+  confidence: 'high' | 'medium' | 'low'
+  dueDate: string | null  // backward-compat alias for resolvedDate
+}
+
 export interface DebriefExtraction {
   summary: string
-  commitments: Array<{ description: string; dueDate: string | null }>
+  myCommitments: DebriefCommitment[]
+  contactCommitments: DebriefCommitment[]
   newContactsMentioned: Array<{ name: string; org: string | null; context: string }>
-  followUps: Array<{ description: string }>
+  followUps: Array<{ description: string; originalWords: string }>
   relationshipNotes: string
   topicsDiscussed: string[]
+  // Legacy compat — populated from myCommitments for downstream consumers
+  commitments: Array<{ description: string; dueDate: string | null }>
 }
