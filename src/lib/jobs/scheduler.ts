@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { runScoreUpdate } from './score-update'
 import { runCadenceCheck } from './cadence-check'
 import { generateDailyBriefing } from './daily-briefing'
+import { runDbBackup } from './db-backup'
 
 let scheduled = false
 
@@ -47,5 +48,16 @@ export function startScheduler() {
     }
   })
 
-  console.log('[Scheduler] Jobs scheduled: score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6:00AM)')
+  // Database backup: daily at 2:00 AM
+  cron.schedule('0 2 * * *', () => {
+    console.log('[Job] Running database backup...')
+    try {
+      const result = runDbBackup()
+      console.log(`[Job] Backup created: ${result.backupPath} (${result.cleaned} old backups cleaned)`)
+    } catch (error) {
+      console.error('[Job] Database backup failed:', error)
+    }
+  })
+
+  console.log('[Scheduler] Jobs scheduled: db_backup(2AM), score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6AM)')
 }

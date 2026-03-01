@@ -96,6 +96,21 @@ async function getDashboardData() {
     },
   })
 
+  // Weekly trend data (last 8 weeks) for sparklines
+  const weeklyTrends: Array<{ week: string; interactions: number; outreach: number }> = []
+  for (let i = 7; i >= 0; i--) {
+    const weekStart = new Date(Date.now() - (i + 1) * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const weekEnd = new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const weekLabel = new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+    const [weekInteractions, weekOutreach] = await Promise.all([
+      prisma.interaction.count({ where: { date: { gte: weekStart, lt: weekEnd } } }),
+      prisma.outreachQueue.count({ where: { status: 'sent', sentAt: { gte: weekStart, lt: weekEnd } } }),
+    ])
+
+    weeklyTrends.push({ week: weekLabel, interactions: weekInteractions, outreach: weekOutreach })
+  }
+
   const totalContacts = allContacts.length
   const overdueTier1 = overdueContacts.filter(c => c.tier === 1).length
   const overdueTier2 = overdueContacts.filter(c => c.tier === 2).length
@@ -112,6 +127,7 @@ async function getDashboardData() {
     contacted7d: contacted7d.length,
     contacted30d: contacted30d.length,
     outreachSentThisWeek,
+    weeklyTrends,
     recentSignals: recentSignals.map(s => ({
       ...s,
       contactName: s.contact.name,

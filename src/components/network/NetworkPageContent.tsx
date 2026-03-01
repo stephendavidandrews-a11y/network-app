@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { TIER_COLORS, CATEGORIES } from '@/lib/constants'
-import { Users } from 'lucide-react'
 import { NetworkGraph } from './NetworkGraph'
+import { PathwayFinder } from './PathwayFinder'
 
 interface Props {
   contacts: Array<{
@@ -70,6 +70,9 @@ export function NetworkPageContent({ contacts, relationships, categoryCounts }: 
 
       {/* Network Graph */}
       <NetworkGraph />
+
+      {/* Pathway Finder */}
+      <PathwayFinder contacts={contacts} />
 
       {/* Gap Analysis */}
       <div className="rounded-lg border bg-white p-6">

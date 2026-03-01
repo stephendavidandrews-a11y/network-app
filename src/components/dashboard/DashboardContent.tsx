@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils'
 import { TIER_COLORS, STATUS_COLORS } from '@/lib/constants'
 import { formatRelativeDate, formatDate } from '@/lib/utils'
+import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 
 interface DashboardProps {
   data: {
@@ -29,6 +30,7 @@ interface DashboardProps {
     contacted7d: number
     contacted30d: number
     outreachSentThisWeek: number
+    weeklyTrends: Array<{ week: string; interactions: number; outreach: number }>
     recentSignals: Array<{
       id: string
       signalType: string
@@ -176,6 +178,51 @@ export function DashboardContent({ data }: DashboardProps) {
             alert={data.overdueTier1 > 0}
           />
           <MetricCard label="Outreach Sent (7d)" value={data.outreachSentThisWeek} />
+        </div>
+        {/* Sparkline charts */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <div className="rounded-lg border bg-white p-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Interactions (8 weeks)</p>
+            <div className="h-16">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data.weeklyTrends}>
+                  <defs>
+                    <linearGradient id="interactionGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="week" hide />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px' }}
+                    labelStyle={{ fontSize: 11, color: '#6b7280' }}
+                  />
+                  <Area type="monotone" dataKey="interactions" stroke="#3b82f6" strokeWidth={2} fill="url(#interactionGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="rounded-lg border bg-white p-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Outreach Sent (8 weeks)</p>
+            <div className="h-16">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data.weeklyTrends}>
+                  <defs>
+                    <linearGradient id="outreachGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="week" hide />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px' }}
+                    labelStyle={{ fontSize: 11, color: '#6b7280' }}
+                  />
+                  <Area type="monotone" dataKey="outreach" stroke="#10b981" strokeWidth={2} fill="url(#outreachGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </section>
 

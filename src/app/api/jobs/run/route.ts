@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { runCadenceCheck } from '@/lib/jobs/cadence-check'
 import { runScoreUpdate } from '@/lib/jobs/score-update'
 import { generateDailyBriefing } from '@/lib/jobs/daily-briefing'
+import { runDbBackup } from '@/lib/jobs/db-backup'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
@@ -34,6 +35,10 @@ export async function POST(request: NextRequest) {
             briefing: { date: briefing.date },
           },
         })
+      }
+      case 'db_backup': {
+        const result = runDbBackup()
+        return NextResponse.json({ job, result })
       }
       default:
         return NextResponse.json({ error: `Unknown job: ${job}` }, { status: 400 })
