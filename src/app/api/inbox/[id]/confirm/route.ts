@@ -58,7 +58,27 @@ export async function POST(
       return NextResponse.json({ error: 'Item already confirmed' }, { status: 400 })
     }
 
-    const extraction: IngestionExtraction = editedExtraction || JSON.parse(item.extraction)
+    const rawExtraction: IngestionExtraction = editedExtraction || JSON.parse(item.extraction)
+
+    // Defensive: normalize all arrays so .map()/.length never crash on null/undefined
+    const extraction: IngestionExtraction = {
+      ...rawExtraction,
+      myCommitments: rawExtraction.myCommitments || [],
+      theirCommitments: rawExtraction.theirCommitments || [],
+      asks: rawExtraction.asks || [],
+      offers: rawExtraction.offers || [],
+      newContactsMentioned: rawExtraction.newContactsMentioned || [],
+      existingContactsMentioned: rawExtraction.existingContactsMentioned || [],
+      observedConnections: rawExtraction.observedConnections || [],
+      calendarEvents: rawExtraction.calendarEvents || [],
+      schedulingLeads: rawExtraction.schedulingLeads || [],
+      orgIntelligence: rawExtraction.orgIntelligence || [],
+      statusChanges: rawExtraction.statusChanges || [],
+      topicsDiscussed: rawExtraction.topicsDiscussed || [],
+      lifeEvents: rawExtraction.lifeEvents || [],
+      referencedResources: rawExtraction.referencedResources || [],
+    }
+
     const manifest: ConfirmManifest = {}
     const now = new Date().toISOString()
 
@@ -76,9 +96,12 @@ export async function POST(
       )
     )
 
+    console.log(`[Inbox] Item ${id}: source=${item.source}, itemType=${extraction.itemType}, contactId=${item.contactId}, shouldCreateInteraction=${!!shouldCreateInteraction}`)
+
     if (shouldCreateInteraction && item.contactId) {
       const interactionType = resolveInteractionType(item.source, item.rawContent)
       const interactionDate = resolveInteractionDate(item)
+      console.log(`[Inbox] Creating interaction: type=${interactionType}, date=${interactionDate}`)
 
       // Build legacy commitments JSON for backward compat
       const legacyCommitments = extraction.myCommitments.map(c => ({
@@ -153,6 +176,7 @@ export async function POST(
     // Always update for any confirmed item with a contact (not just interaction-type)
     if (item.contactId && extraction.itemType !== 'irrelevant') {
       const interactionDate = resolveInteractionDate(item)
+      console.log(`[Inbox] Updating lastInteractionDate for contact ${item.contactId} → ${interactionDate}`)
       const currentContact = await prisma.contact.findUnique({
         where: { id: item.contactId },
         select: { status: true, lastInteractionDate: true },
