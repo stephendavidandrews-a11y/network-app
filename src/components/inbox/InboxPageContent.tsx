@@ -23,9 +23,11 @@ import {
   Briefcase,
   Clock,
   CheckCircle,
+  CalendarPlus,
   Loader2,
   Plus,
   Send,
+  MapPin,
 } from 'lucide-react'
 import { TIER_COLORS } from '@/lib/constants'
 import type { IngestionExtraction } from '@/types'
@@ -415,7 +417,69 @@ interface InboxCardProps {
 function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isLoading, formatTime }: InboxCardProps) {
   const [dismissReason, setDismissReason] = useState('')
   const [showDismissForm, setShowDismissForm] = useState(false)
+  const [editedCalEvents, setEditedCalEvents] = useState<Record<number, Partial<{ title: string; date: string; startTime: string; endTime: string; location: string }>>>({})
+  const [addedCalEvents, setAddedCalEvents] = useState<Set<number>>(new Set())
+  const [calEventLoading, setCalEventLoading] = useState<number | null>(null)
+  const [calEventError, setCalEventError] = useState<string | null>(null)
   const ext = item.extraction
+
+  const updateCalEvent = (idx: number, field: string, value: string) => {
+    setEditedCalEvents(prev => ({
+      ...prev,
+      [idx]: { ...(prev[idx] || {}), [field]: value },
+    }))
+  }
+
+  const handleAddToCalendar = async (idx: number) => {
+    if (!ext) return
+    const event = ext.calendarEvents[idx]
+    if (!event) return
+
+    const edits = editedCalEvents[idx] || {}
+    const title = edits.title || event.title
+    const date = edits.date || event.date
+    const startTime = edits.startTime || event.startTime
+    const endTime = edits.endTime || event.endTime
+    const location = edits.location || event.location
+
+    if (!date) {
+      setCalEventError('Date is required')
+      return
+    }
+
+    // Build ISO datetimes
+    const startISO = startTime ? `${date}T${startTime}:00` : `${date}T09:00:00`
+    const endISO = endTime ? `${date}T${endTime}:00` : (startTime ? `${date}T${(parseInt(startTime.split(':')[0]) + 1).toString().padStart(2, '0')}:${startTime.split(':')[1]}:00` : `${date}T10:00:00`)
+
+    setCalEventLoading(idx)
+    setCalEventError(null)
+
+    try {
+      const res = await fetch('/api/calendar/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary: title,
+          start: startISO,
+          end: endISO,
+          location: location || undefined,
+          description: item.contactName ? `With ${item.contactName}${item.contactOrg ? ` (${item.contactOrg})` : ''}` : undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      setAddedCalEvents(prev => {
+        const next = new Set(Array.from(prev))
+        next.add(idx)
+        return next
+      })
+    } catch (err) {
+      setCalEventError(err instanceof Error ? err.message : 'Failed to create event')
+    } finally {
+      setCalEventLoading(null)
+    }
+  }
 
   const SourceIcon = SOURCE_ICONS[item.source] || FileText
   const isPending = item.status === 'pending'
@@ -573,16 +637,92 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
               </ExtractSection>
             )}
 
-            {/* Calendar Events */}
+            {/* Calendar Events — Editable + Add to Calendar */}
             {ext.calendarEvents.length > 0 && (
               <ExtractSection icon={Calendar} title="Calendar Events" color="text-cyan-600">
-                {ext.calendarEvents.map((e, i) => (
-                  <div key={i} className="text-sm text-gray-700">
-                    {e.title}
-                    {e.date && <span className="text-gray-400 ml-1">{e.date}</span>}
-                    {e.startTime && <span className="text-gray-400 ml-1">{e.startTime}</span>}
-                  </div>
-                ))}
+                {ext.calendarEvents.map((e, i) => {
+                  const edits = editedCalEvents[i] || {}
+                  const isAdded = addedCalEvents.has(i)
+                  const isLoadingCal = calEventLoading === i
+
+                  return (
+                    <div key={i} className={`rounded-md border p-3 space-y-2 ${isAdded ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50/50'}`}>
+                      {/* Title */}
+                      <input
+                        type="text"
+                        value={edits.title ?? e.title}
+                        onChange={ev => updateCalEvent(i, 'title', ev.target.value)}
+                        className="w-full text-sm font-medium text-gray-900 bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
+                        disabled={isAdded}
+                      />
+
+                      {/* Date + Time Row */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="date"
+                          value={edits.date ?? e.date ?? ''}
+                          onChange={ev => updateCalEvent(i, 'date', ev.target.value)}
+                          className="text-xs text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                          disabled={isAdded}
+                        />
+                        <input
+                          type="time"
+                          value={edits.startTime ?? e.startTime ?? ''}
+                          onChange={ev => updateCalEvent(i, 'startTime', ev.target.value)}
+                          className="text-xs text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                          disabled={isAdded}
+                        />
+                        <span className="text-xs text-gray-400">—</span>
+                        <input
+                          type="time"
+                          value={edits.endTime ?? e.endTime ?? ''}
+                          onChange={ev => updateCalEvent(i, 'endTime', ev.target.value)}
+                          className="text-xs text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                          disabled={isAdded}
+                        />
+                      </div>
+
+                      {/* Location */}
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                        <input
+                          type="text"
+                          value={edits.location ?? e.location ?? ''}
+                          onChange={ev => updateCalEvent(i, 'location', ev.target.value)}
+                          placeholder="Location (optional)"
+                          className="flex-1 text-xs text-gray-600 bg-transparent border-0 p-0 placeholder-gray-300 focus:outline-none focus:ring-0"
+                          disabled={isAdded}
+                        />
+                      </div>
+
+                      {/* Add to Calendar Button */}
+                      <div className="flex items-center gap-2 pt-1">
+                        {isAdded ? (
+                          <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Added to Calendar
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleAddToCalendar(i)}
+                            disabled={isLoadingCal}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 rounded-md transition-colors disabled:opacity-50"
+                          >
+                            {isLoadingCal ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <CalendarPlus className="w-3.5 h-3.5" />
+                            )}
+                            Add to Calendar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {calEventError && (
+                  <p className="text-xs text-red-600 mt-1">{calEventError}</p>
+                )}
               </ExtractSection>
             )}
 
