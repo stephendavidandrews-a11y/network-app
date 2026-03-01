@@ -209,11 +209,13 @@ export function VoiceDebriefReview({
       if (res.ok) {
         setCreatedContacts(prev => { const next = new Set(Array.from(prev)); next.add(index); return next })
       } else {
-        alert('Failed to create contact')
+        const errData = await res.json().catch(() => ({ error: res.statusText }))
+        console.error('Contact creation failed:', errData)
+        alert(`Failed to create contact: ${errData.error || res.statusText}`)
       }
     } catch (error) {
       console.error('Contact creation failed:', error)
-      alert('Failed to create contact')
+      alert(`Failed to create contact: ${error instanceof Error ? error.message : 'Network error'}`)
     } finally {
       setCreatingContact(null)
     }
