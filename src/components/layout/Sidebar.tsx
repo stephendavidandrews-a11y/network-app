@@ -12,6 +12,7 @@ import {
   Network,
   CheckSquare,
   Database,
+  Inbox,
   Settings,
   LogOut,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Inbox', href: '/inbox', icon: Inbox },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Interactions', href: '/interactions', icon: MessageSquare },
   { name: 'Outreach', href: '/outreach', icon: Send },
@@ -52,7 +54,9 @@ export function Sidebar() {
               ? pathname === '/'
               : item.href === '/contacts'
                 ? pathname === '/contacts' || (pathname.startsWith('/contacts/') && !pathname.startsWith('/contacts/enrich'))
-                : pathname.startsWith(item.href)
+                : item.href === '/inbox'
+                  ? pathname === '/inbox'
+                  : pathname.startsWith(item.href)
 
           return (
             <Link

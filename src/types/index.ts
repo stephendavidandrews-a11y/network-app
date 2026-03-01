@@ -277,6 +277,268 @@ export interface EnrichmentPipelineStats {
   rejected: number
 }
 
+// ── Ingestion System Types ──
+
+export type IngestionSource = 'email' | 'imessage_auto' | 'ios_shortcut' | 'voice' | 'signal_forward' | 'manual'
+
+export type IngestionItemType = 'interaction' | 'intelligence_signal' | 'scheduling' | 'irrelevant'
+
+export type IngestionStatus = 'pending' | 'confirmed' | 'edited' | 'dismissed' | 'auto_handled'
+
+export type IngestionSentiment = 'warm' | 'neutral' | 'transactional' | 'tense' | 'enthusiastic'
+
+export type RelationshipDelta = 'strengthened' | 'maintained' | 'weakened' | 'new'
+
+// Full extraction output from Claude — produced for every ingested item
+export interface IngestionExtraction {
+  // Classification
+  itemType: IngestionItemType
+
+  // Core
+  summary: string
+  topicsDiscussed: string[]
+
+  // Commitments (hard, with deadlines)
+  myCommitments: IngestionCommitment[]
+  theirCommitments: IngestionCommitment[]
+
+  // Asks & Offers (soft, no firm deadlines)
+  asks: SoftAsk[]
+  offers: StandingOfferExtraction[]
+
+  // People
+  newContactsMentioned: NewContactExtraction[]
+  existingContactsMentioned: string[]
+  observedConnections: ObservedConnection[]
+
+  // Scheduling
+  calendarEvents: CalendarEventExtraction[]
+  schedulingLeads: SchedulingLeadExtraction[]
+
+  // Intelligence
+  orgIntelligence: OrgIntelExtraction[]
+  referencedResources: ResourceExtraction[]
+
+  // Life Events
+  lifeEvents: LifeEventExtraction[]
+
+  // Relationship
+  relationshipNotes: string
+  sentiment: IngestionSentiment
+  relationshipDelta: RelationshipDelta
+
+  // Status Changes
+  statusChanges: StatusChangeExtraction[]
+}
+
+export interface IngestionCommitment {
+  description: string
+  originalWords: string
+  resolvedDate: string | null
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface SoftAsk {
+  description: string
+  direction: 'from_me' | 'from_them'
+  originalWords: string
+}
+
+export interface StandingOfferExtraction {
+  description: string
+  offeredBy: 'me' | 'them'
+  originalWords: string
+}
+
+export interface NewContactExtraction {
+  name: string
+  org: string | null
+  title: string | null
+  email: string | null
+  phone: string | null
+  context: string
+  connectionTo: string | null
+}
+
+export interface ObservedConnection {
+  person1: string
+  person2: string
+  nature: string
+  strength: 'strong' | 'moderate' | 'weak' | 'unknown'
+  source: string
+  directional: boolean
+}
+
+export interface CalendarEventExtraction {
+  title: string
+  originalWords: string
+  date: string | null
+  startTime: string | null
+  endTime: string | null
+  location: string | null
+  attendees: string[]
+}
+
+export interface SchedulingLeadExtraction {
+  description: string
+  originalWords: string
+  timeframe: string | null
+}
+
+export interface OrgIntelExtraction {
+  organization: string
+  intelligence: string
+  source: string
+}
+
+export interface ResourceExtraction {
+  description: string
+  type: 'paper' | 'article' | 'podcast' | 'document' | 'book' | 'other'
+  url: string | null
+  action: 'they_will_send' | 'i_should_read' | 'i_will_send' | 'reference_only'
+}
+
+export interface LifeEventExtraction {
+  description: string
+  person: string
+  date: string | null
+  recurring: boolean
+}
+
+export interface StatusChangeExtraction {
+  person: string
+  changeType: 'job_change' | 'promotion' | 'departure' | 'org_change' | 'other'
+  from: string | null
+  to: string | null
+  description: string
+}
+
+// Database record types for ingestion models
+
+export interface IngestionItemRecord {
+  id: string
+  source: IngestionSource
+  itemType: IngestionItemType
+  rawContent: string
+  transcript: string | null
+  contactId: string | null
+  contactHint: string | null
+  extraction: IngestionExtraction
+  manifest: ConfirmManifest | null
+  status: IngestionStatus
+  sensitivityFlag: boolean
+  contentHash: string | null
+  threadId: string | null
+  clusterId: string | null
+  dismissReason: string | null
+  confidence: number | null
+  autoHandled: boolean
+  createdAt: string
+  reviewedAt: string | null
+  // Enriched
+  contactName?: string
+  contactOrg?: string | null
+  contactTier?: number
+}
+
+// Manifest of everything a confirmed ingestion item created (for atomic undo)
+export interface ConfirmManifest {
+  interactionId?: string
+  commitmentIds?: string[]
+  signalIds?: string[]
+  standingOfferIds?: string[]
+  schedulingLeadIds?: string[]
+  contactIds?: string[]       // new contacts created
+  relationshipIds?: string[]  // observed connections
+  dossierVersion?: number
+  calendarEventIds?: string[] // Google Calendar events created
+}
+
+export interface StandingOfferRecord {
+  id: string
+  contactId: string
+  description: string
+  offeredBy: 'me' | 'them'
+  originalWords: string
+  sourceInteractionId: string | null
+  sourceIngestionId: string | null
+  active: boolean
+  createdAt: string
+  usedAt: string | null
+  // Enriched
+  contactName?: string
+  contactOrg?: string | null
+}
+
+export interface SchedulingLeadRecord {
+  id: string
+  contactId: string
+  description: string
+  originalWords: string | null
+  timeframe: string | null
+  resolvedDate: string | null
+  status: 'open' | 'scheduled' | 'stale' | 'auto_resolved'
+  linkedEventId: string | null
+  sourceIngestionId: string | null
+  createdAt: string
+  // Enriched
+  contactName?: string
+  contactOrg?: string | null
+}
+
+export interface ContactDossierRecord {
+  id: string
+  contactId: string
+  version: number
+  content: string
+  updatedBy: 'incremental' | 'full_resynthesis'
+  sourceInteractionId: string | null
+  createdAt: string
+}
+
+export interface LearningSignalRecord {
+  id: string
+  ingestionItemId: string
+  action: 'confirmed' | 'dismissed' | 'edited' | 'auto_override'
+  editDetails: string | null
+  dismissReason: string | null
+  teachMeResponse: string | null
+  createdAt: string
+}
+
+// Ingestion API request body
+export interface IngestRequest {
+  source: IngestionSource
+  contactHint?: string
+  content?: string
+  audioBase64?: string
+  metadata?: {
+    originalFrom?: string
+    originalTo?: string
+    subject?: string
+    forwardedFrom?: string
+    threadId?: string
+    groupParticipants?: number
+    signature?: {
+      name?: string
+      title?: string
+      org?: string
+      phone?: string
+      email?: string
+      linkedin?: string
+    }
+  }
+}
+
+// Inbox stats for dashboard
+export interface InboxStats {
+  pending: number
+  confirmed: number
+  dismissed: number
+  autoHandled: number
+  todayPending: number
+}
+
 // ── Voice Debrief Types ──
 
 export interface DebriefCommitment {
