@@ -110,10 +110,10 @@ export function OutreachPageContent({ queue, history }: Props) {
                       className="flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
                       <CheckCircle className="h-3 w-3" /> Approve
                     </button>
-                    <button onClick={() => setEditingId(item.id)}
+                    <Link href={`/outreach/${item.id}/edit`}
                       className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                       <Edit className="h-3 w-3" /> Edit
-                    </button>
+                    </Link>
                     <button onClick={() => handleAction(item.id, 'defer')}
                       className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                       <Clock className="h-3 w-3" /> Defer
