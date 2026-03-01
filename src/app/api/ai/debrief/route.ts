@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import Anthropic from '@anthropic-ai/sdk'
-import type { DebriefExtraction, DebriefCommitment } from '@/types'
+import type { DebriefExtraction, DebriefCommitment, DebriefCalendarEvent } from '@/types'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -114,6 +114,7 @@ Return ONLY valid JSON in this exact format:
       "description": "What Stephen committed to do, cleaned up",
       "originalWords": "The exact words from the transcript where Stephen made this commitment",
       "resolvedDate": "YYYY-MM-DD or null if no date mentioned or inferrable",
+      "resolvedTime": "HH:MM in 24h format or null if no specific time mentioned",
       "confidence": "high|medium|low — how confident you are this is a real commitment"
     }
   ],
@@ -122,7 +123,19 @@ Return ONLY valid JSON in this exact format:
       "description": "What ${contact.name} committed to do for Stephen",
       "originalWords": "The exact words from the transcript",
       "resolvedDate": "YYYY-MM-DD or null",
+      "resolvedTime": "HH:MM or null",
       "confidence": "high|medium|low"
+    }
+  ],
+  "calendarEvents": [
+    {
+      "title": "Event name (e.g. 'Church', 'Bible Study with Josh Hawley')",
+      "originalWords": "The exact words from the transcript describing this event",
+      "date": "YYYY-MM-DD",
+      "startTime": "HH:MM in 24h format (e.g. '10:30' for 10:30 AM, '18:30' for 6:30 PM)",
+      "endTime": "HH:MM or null (estimate +1 hour from start if not mentioned)",
+      "location": "Location if mentioned, or null",
+      "attendees": ["Names of people mentioned as attending"]
     }
   ],
   "newContactsMentioned": [{"name": "string", "org": "string or null", "context": "why they came up"}],
@@ -131,14 +144,24 @@ Return ONLY valid JSON in this exact format:
   "topicsDiscussed": ["keyword1", "keyword2"]
 }
 
-## Commitment vs Follow-Up Distinction
-- COMMITMENT: A specific promise with implied accountability. "I'll send you that memo" = commitment. "${contact.name} said they'd introduce me to their colleague" = contactCommitment.
+## Event vs Commitment vs Follow-Up Distinction
+- CALENDAR EVENT: Something scheduled at a specific date/time that Stephen plans to attend. "Church at 10:30", "dinner at 7pm", "bible study at 6:30", "conference on March 15th". These go in calendarEvents.
+- COMMITMENT: A specific promise with implied accountability. "I'll send you that memo" = myCommitment. "${contact.name} said they'd introduce me to their colleague" = contactCommitment. These are action items, NOT scheduled events.
 - FOLLOW-UP: A looser action item. "I should look into that regulation" = follow-up. "Interesting idea to explore" = follow-up.
+
+IMPORTANT: When the speaker mentions multiple events/commitments, extract EACH ONE as a separate entry. Do not merge them.
 
 ## Confidence Levels
 - HIGH: Explicit statement like "I will", "I'll", "I promise to", "Let me send you"
 - MEDIUM: Implied agreement or "I should probably", "that would be good to do"
 - LOW: Vague intent, "maybe I could", "we should think about"
+
+## Time Parsing
+- "10:30 AM" or "10:30 in the morning" → "10:30"
+- "6:30 PM" or "6:30 in the evening" → "18:30"
+- "noon" → "12:00"
+- "midnight" → "00:00"
+- If only a time is mentioned without a date, assume today (${todayStr})
 
 If a field has no relevant content, use an empty array [] or empty string "".
 Do NOT include any text outside the JSON object.`
@@ -225,6 +248,7 @@ Extract the structured information now. Remember to resolve any temporal referen
       description: String(c.description || ''),
       originalWords: String(c.originalWords || ''),
       resolvedDate: (c.resolvedDate as string) || null,
+      resolvedTime: (c.resolvedTime as string) || null,
       confidence: (['high', 'medium', 'low'].includes(c.confidence as string)
         ? c.confidence as 'high' | 'medium' | 'low'
         : 'medium'),
@@ -246,6 +270,18 @@ Extract the structured information now. Remember to resolve any temporal referen
         }))
       : []
 
+    const calendarEvents: DebriefCalendarEvent[] = Array.isArray(raw.calendarEvents)
+      ? (raw.calendarEvents as Array<Record<string, unknown>>).map(e => ({
+          title: String(e.title || ''),
+          originalWords: String(e.originalWords || ''),
+          date: (e.date as string) || null,
+          startTime: (e.startTime as string) || null,
+          endTime: (e.endTime as string) || null,
+          location: (e.location as string) || null,
+          attendees: Array.isArray(e.attendees) ? (e.attendees as string[]).map(String) : [],
+        }))
+      : []
+
     const newContactsMentioned = Array.isArray(raw.newContactsMentioned)
       ? (raw.newContactsMentioned as Array<Record<string, unknown>>).map(nc => ({
           name: String(nc.name || ''),
@@ -264,6 +300,7 @@ Extract the structured information now. Remember to resolve any temporal referen
       summary: String(raw.summary || ''),
       myCommitments,
       contactCommitments,
+      calendarEvents,
       newContactsMentioned,
       followUps,
       relationshipNotes: String(raw.relationshipNotes || ''),

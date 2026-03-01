@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import {
   CheckCircle,
   ChevronDown,
@@ -14,9 +13,12 @@ import {
   AlertTriangle,
   Quote,
   ArrowRightLeft,
+  CalendarPlus,
+  Clock,
+  ExternalLink,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { DebriefExtraction, DebriefCommitment } from '@/types'
+import type { DebriefExtraction, DebriefCommitment, DebriefCalendarEvent } from '@/types'
 
 interface VoiceDebriefReviewProps {
   contactId: string
@@ -29,6 +31,13 @@ const CONFIDENCE_BADGE: Record<string, { label: string; color: string }> = {
   high: { label: 'High', color: 'bg-green-100 text-green-700' },
   medium: { label: 'Med', color: 'bg-amber-100 text-amber-700' },
   low: { label: 'Low', color: 'bg-gray-100 text-gray-500' },
+}
+
+function formatTime12h(time24: string): string {
+  const [h, m] = time24.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
 export function VoiceDebriefReview({
@@ -52,6 +61,7 @@ export function VoiceDebriefReview({
       description: c.description,
       originalWords: c.originalWords || '',
       resolvedDate: c.resolvedDate || null,
+      resolvedTime: c.resolvedTime || null,
       confidence: c.confidence || 'medium',
       dueDate: c.dueDate || c.resolvedDate || '',
     }))
@@ -63,10 +73,24 @@ export function VoiceDebriefReview({
       description: c.description,
       originalWords: c.originalWords || '',
       resolvedDate: c.resolvedDate || null,
+      resolvedTime: c.resolvedTime || null,
       confidence: c.confidence || 'medium',
       dueDate: c.dueDate || c.resolvedDate || '',
     }))
   )
+
+  // Calendar events
+  const [calendarEvents, setCalendarEvents] = useState<(DebriefCalendarEvent & { addedToCalendar?: boolean })[]>(
+    (extraction.calendarEvents || []).map(e => ({
+      ...e,
+      addedToCalendar: false,
+    }))
+  )
+  const [addingToCalendar, setAddingToCalendar] = useState<number | null>(null)
+
+  // New contacts — track which have been created inline
+  const [createdContacts, setCreatedContacts] = useState<Set<number>>(new Set())
+  const [creatingContact, setCreatingContact] = useState<number | null>(null)
 
   const [followUpRequired, setFollowUpRequired] = useState(
     (extraction.followUps || []).length > 0
@@ -79,7 +103,7 @@ export function VoiceDebriefReview({
   // Commitment management helpers
   const addMyCommitment = () => {
     setMyCommitments([...myCommitments, {
-      description: '', originalWords: '', resolvedDate: null, confidence: 'medium', dueDate: '',
+      description: '', originalWords: '', resolvedDate: null, resolvedTime: null, confidence: 'medium', dueDate: '',
     }])
   }
 
@@ -95,7 +119,7 @@ export function VoiceDebriefReview({
 
   const addContactCommitment = () => {
     setContactCommitments([...contactCommitments, {
-      description: '', originalWords: '', resolvedDate: null, confidence: 'medium', dueDate: '',
+      description: '', originalWords: '', resolvedDate: null, resolvedTime: null, confidence: 'medium', dueDate: '',
     }])
   }
 
@@ -107,6 +131,92 @@ export function VoiceDebriefReview({
     setContactCommitments(contactCommitments.map((c, i) =>
       i === index ? { ...c, [field]: value } : c
     ))
+  }
+
+  const updateCalendarEvent = (index: number, field: string, value: string) => {
+    setCalendarEvents(calendarEvents.map((e, i) =>
+      i === index ? { ...e, [field]: value } : e
+    ))
+  }
+
+  const removeCalendarEvent = (index: number) => {
+    setCalendarEvents(calendarEvents.filter((_, i) => i !== index))
+  }
+
+  // Add event to Google Calendar via API
+  const addToGoogleCalendar = async (index: number) => {
+    const event = calendarEvents[index]
+    if (!event.date) return
+
+    setAddingToCalendar(index)
+    try {
+      // Build datetime strings (Eastern Time)
+      const startDateTime = event.startTime
+        ? `${event.date}T${event.startTime}:00-05:00`
+        : `${event.date}T09:00:00-05:00`
+      const endDateTime = event.endTime
+        ? `${event.date}T${event.endTime}:00-05:00`
+        : event.startTime
+          ? `${event.date}T${String(parseInt(event.startTime.split(':')[0]) + 1).padStart(2, '0')}:${event.startTime.split(':')[1]}:00-05:00`
+          : `${event.date}T10:00:00-05:00`
+
+      const res = await fetch('/api/calendar/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary: event.title,
+          start: startDateTime,
+          end: endDateTime,
+          location: event.location || undefined,
+        }),
+      })
+
+      if (res.ok) {
+        setCalendarEvents(calendarEvents.map((e, i) =>
+          i === index ? { ...e, addedToCalendar: true } : e
+        ))
+      } else {
+        const err = await res.json()
+        alert(`Failed to add to calendar: ${err.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Calendar add failed:', error)
+      alert('Failed to add to calendar. Check calendar connection.')
+    } finally {
+      setAddingToCalendar(null)
+    }
+  }
+
+  // Create contact inline via API (without navigating away)
+  const createContactInline = async (index: number) => {
+    const nc = extraction.newContactsMentioned[index]
+    if (!nc) return
+
+    setCreatingContact(index)
+    try {
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nc.name,
+          organization: nc.org || '',
+          notes: `Mentioned in debrief with ${contactName}: ${nc.context}`,
+          tier: 3,
+          status: 'target',
+        }),
+      })
+
+      if (res.ok) {
+        setCreatedContacts(prev => { const next = new Set(Array.from(prev)); next.add(index); return next })
+      } else {
+        alert('Failed to create contact')
+      }
+    } catch (error) {
+      console.error('Contact creation failed:', error)
+      alert('Failed to create contact')
+    } finally {
+      setCreatingContact(null)
+    }
   }
 
   const handleSave = async () => {
@@ -122,7 +232,6 @@ export function VoiceDebriefReview({
         : finalSummary
 
       // Combine both commitment types into legacy format for the interaction record
-      // Mark contact commitments with a prefix so they're distinguishable
       const allCommitments = [
         ...myCommitments.filter(c => c.description.trim()).map(c => ({
           description: c.description,
@@ -137,6 +246,34 @@ export function VoiceDebriefReview({
           fulfilled_date: null as string | null,
         })),
       ]
+
+      // Auto-add any calendar events that haven't been added yet
+      const unadded = calendarEvents.filter(e => !e.addedToCalendar && e.date && e.title)
+      if (unadded.length > 0) {
+        await Promise.allSettled(
+          unadded.map(async (evt) => {
+            const startDateTime = evt.startTime
+              ? `${evt.date}T${evt.startTime}:00-05:00`
+              : `${evt.date}T09:00:00-05:00`
+            const endDateTime = evt.endTime
+              ? `${evt.date}T${evt.endTime}:00-05:00`
+              : evt.startTime
+                ? `${evt.date}T${String(parseInt(evt.startTime.split(':')[0]) + 1).padStart(2, '0')}:${evt.startTime.split(':')[1]}:00-05:00`
+                : `${evt.date}T10:00:00-05:00`
+
+            return fetch('/api/calendar/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                summary: evt.title,
+                start: startDateTime,
+                end: endDateTime,
+                location: evt.location || undefined,
+              }),
+            })
+          })
+        )
+      }
 
       const res = await fetch('/api/interactions', {
         method: 'POST',
@@ -229,6 +366,98 @@ export function VoiceDebriefReview({
         </div>
       )}
 
+      {/* Calendar Events */}
+      {calendarEvents.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <CalendarPlus className="h-3.5 w-3.5 text-emerald-600" />
+              Calendar Events
+            </label>
+          </div>
+          <div className="space-y-3">
+            {calendarEvents.map((evt, i) => (
+              <div key={i} className={cn(
+                'rounded-md border p-3 space-y-2',
+                evt.addedToCalendar
+                  ? 'border-green-200 bg-green-50/50'
+                  : 'border-emerald-100 bg-emerald-50/30'
+              )}>
+                <div className="flex gap-2 items-start">
+                  <input
+                    value={evt.title}
+                    onChange={e => updateCalendarEvent(i, 'title', e.target.value)}
+                    placeholder="Event title"
+                    className="flex-1 rounded-md border px-3 py-1.5 text-sm"
+                  />
+                  <input
+                    type="date"
+                    value={evt.date || ''}
+                    onChange={e => updateCalendarEvent(i, 'date', e.target.value)}
+                    className="w-36 rounded-md border px-3 py-1.5 text-sm"
+                  />
+                  <button
+                    onClick={() => removeCalendarEvent(i)}
+                    className="text-gray-400 hover:text-red-500 p-1"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <Clock className="h-3.5 w-3.5 text-gray-400" />
+                  <input
+                    type="time"
+                    value={evt.startTime || ''}
+                    onChange={e => updateCalendarEvent(i, 'startTime', e.target.value)}
+                    className="w-28 rounded-md border px-2 py-1 text-sm"
+                  />
+                  <span className="text-xs text-gray-400">to</span>
+                  <input
+                    type="time"
+                    value={evt.endTime || ''}
+                    onChange={e => updateCalendarEvent(i, 'endTime', e.target.value)}
+                    className="w-28 rounded-md border px-2 py-1 text-sm"
+                  />
+                  {evt.startTime && (
+                    <span className="text-xs text-gray-500">
+                      {formatTime12h(evt.startTime)}
+                      {evt.endTime ? ` – ${formatTime12h(evt.endTime)}` : ''}
+                    </span>
+                  )}
+                </div>
+                {evt.originalWords && (
+                  <div className="flex items-start gap-1.5 pl-1">
+                    <Quote className="h-3 w-3 text-emerald-300 mt-0.5 shrink-0" />
+                    <p className="text-xs text-emerald-500 italic">{evt.originalWords}</p>
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  {evt.addedToCalendar ? (
+                    <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Added to Calendar
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => addToGoogleCalendar(i)}
+                      disabled={!evt.date || addingToCalendar === i}
+                      className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {addingToCalendar === i ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <CalendarPlus className="h-3.5 w-3.5" />
+                      )}
+                      {addingToCalendar === i ? 'Adding...' : 'Add to Calendar'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* My Commitments (Stephen's promises) */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -284,7 +513,7 @@ export function VoiceDebriefReview({
         )}
       </div>
 
-      {/* Contact's Commitments (things they promised Stephen) */}
+      {/* Contact's Commitments */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
@@ -364,7 +593,7 @@ export function VoiceDebriefReview({
         )}
       </div>
 
-      {/* New contacts mentioned */}
+      {/* New contacts mentioned — inline creation, no navigation */}
       {extraction.newContactsMentioned.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">New Contacts Mentioned</label>
@@ -376,13 +605,37 @@ export function VoiceDebriefReview({
                   {nc.org && <p className="text-xs text-gray-500">{nc.org}</p>}
                   <p className="text-xs text-gray-400 mt-0.5">{nc.context}</p>
                 </div>
-                <Link
-                  href={`/contacts/new?name=${encodeURIComponent(nc.name)}${nc.org ? `&org=${encodeURIComponent(nc.org)}` : ''}`}
-                  className="flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                  Create
-                </Link>
+                {createdContacts.has(i) ? (
+                  <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Created
+                  </span>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => createContactInline(i)}
+                      disabled={creatingContact === i}
+                      className="flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {creatingContact === i ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-3.5 w-3.5" />
+                      )}
+                      {creatingContact === i ? 'Creating...' : 'Quick Create'}
+                    </button>
+                    <a
+                      href={`/contacts/new?name=${encodeURIComponent(nc.name)}${nc.org ? `&org=${encodeURIComponent(nc.org)}` : ''}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                      title="Open full form in new tab"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Full Form
+                    </a>
+                  </div>
+                )}
               </div>
             ))}
           </div>

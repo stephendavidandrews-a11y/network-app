@@ -236,14 +236,27 @@ export interface DebriefCommitment {
   description: string
   originalWords: string
   resolvedDate: string | null
+  resolvedTime: string | null  // HH:MM 24h format
   confidence: 'high' | 'medium' | 'low'
   dueDate: string | null  // backward-compat alias for resolvedDate
+}
+
+export interface DebriefCalendarEvent {
+  title: string
+  originalWords: string
+  date: string | null       // YYYY-MM-DD
+  startTime: string | null  // HH:MM 24h
+  endTime: string | null    // HH:MM 24h
+  location: string | null
+  attendees: string[]       // names mentioned
+  addedToCalendar?: boolean // client-side tracking
 }
 
 export interface DebriefExtraction {
   summary: string
   myCommitments: DebriefCommitment[]
   contactCommitments: DebriefCommitment[]
+  calendarEvents: DebriefCalendarEvent[]
   newContactsMentioned: Array<{ name: string; org: string | null; context: string }>
   followUps: Array<{ description: string; originalWords: string }>
   relationshipNotes: string

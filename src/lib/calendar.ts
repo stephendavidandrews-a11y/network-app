@@ -4,7 +4,7 @@ import type { CalendarMeeting, CalendarDayData, CalendarLoad } from '@/types'
 
 // ── OAuth2 Client ──
 
-function getCalendarClient(): calendar_v3.Calendar | null {
+export function getCalendarClient(): calendar_v3.Calendar | null {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN
