@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { synthesizeDossier } from '@/lib/dossier/synthesize'
 import type { IngestionExtraction, ConfirmManifest } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -322,6 +323,14 @@ export async function POST(
     })
 
     console.log(`[Inbox] Confirmed item ${id} | manifest: ${JSON.stringify(manifest)}`)
+
+    // Trigger incremental dossier update (fire-and-forget)
+    if (item.contactId) {
+      const summaryContext = extraction.summary || ''
+      synthesizeDossier(item.contactId, 'incremental', summaryContext).catch(err => {
+        console.error(`[Dossier] Incremental update failed for contact ${item.contactId}:`, err)
+      })
+    }
 
     return NextResponse.json({
       success: true,

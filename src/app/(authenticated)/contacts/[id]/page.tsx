@@ -53,6 +53,32 @@ export default async function ContactDetailPage({
     orderBy: [{ fulfilled: 'asc' }, { dueDate: 'asc' }],
   })
 
+  // Fetch latest dossier
+  const latestDossier = await prisma.contactDossier.findFirst({
+    where: { contactId: params.id },
+    orderBy: { version: 'desc' },
+    select: {
+      id: true,
+      version: true,
+      content: true,
+      updatedBy: true,
+      createdAt: true,
+    },
+  })
+
+  // Fetch standing offers for this contact
+  const standingOffers = await prisma.standingOffer.findMany({
+    where: { contactId: params.id, active: true },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      description: true,
+      offeredBy: true,
+      originalWords: true,
+      createdAt: true,
+    },
+  })
+
   // Fetch most recent meeting prep for this contact (today or yesterday)
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   const latestPrep = await prisma.meetingPrep.findFirst({
@@ -103,6 +129,8 @@ export default async function ContactDetailPage({
         generatedAt: latestPrep.generatedAt,
         meetingTitle: latestPrep.meetingTitle,
       } : null}
+      dossier={latestDossier}
+      standingOffers={standingOffers}
     />
   )
 }

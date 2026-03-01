@@ -24,6 +24,8 @@ import {
   Clock,
   CheckCircle,
   Loader2,
+  Plus,
+  Send,
 } from 'lucide-react'
 import { TIER_COLORS } from '@/lib/constants'
 import type { IngestionExtraction } from '@/types'
@@ -103,6 +105,11 @@ export function InboxPageContent() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showIngestForm, setShowIngestForm] = useState(false)
+  const [ingestContent, setIngestContent] = useState('')
+  const [ingestSource, setIngestSource] = useState<string>('manual')
+  const [ingestContactHint, setIngestContactHint] = useState('')
+  const [ingestLoading, setIngestLoading] = useState(false)
 
   const fetchItems = useCallback(async () => {
     try {
@@ -188,6 +195,37 @@ export function InboxPageContent() {
     }
   }
 
+  const handleManualIngest = async () => {
+    if (!ingestContent.trim()) return
+    setIngestLoading(true)
+    try {
+      const res = await fetch('/api/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: ingestSource,
+          content: ingestContent,
+          contactHint: ingestContactHint || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      if (data.duplicate) {
+        setError('Duplicate content — already in queue')
+      } else {
+        setIngestContent('')
+        setIngestContactHint('')
+        setShowIngestForm(false)
+        setFilter('pending')
+        await fetchItems()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to ingest')
+    } finally {
+      setIngestLoading(false)
+    }
+  }
+
   function formatTime(dateStr: string): string {
     try {
       const d = new Date(dateStr)
@@ -223,15 +261,82 @@ export function InboxPageContent() {
             </span>
           )}
         </div>
-        {filter === 'pending' && items.length > 1 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleBatchConfirm}
-            className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+            onClick={() => setShowIngestForm(!showIngestForm)}
+            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+              showIngestForm
+                ? 'text-white bg-blue-600 hover:bg-blue-700'
+                : 'text-slate-300 bg-slate-700/50 hover:bg-slate-700'
+            }`}
           >
-            Confirm All ({items.filter(i => i.extraction?.itemType !== 'irrelevant').length})
+            <Plus className="w-4 h-4" />
+            Add Note
           </button>
-        )}
+          {filter === 'pending' && items.length > 1 && (
+            <button
+              onClick={handleBatchConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+            >
+              Confirm All ({items.filter(i => i.extraction?.itemType !== 'irrelevant').length})
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Manual Ingest Form */}
+      {showIngestForm && (
+        <div className="rounded-lg border border-blue-500/30 bg-slate-800/50 p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <select
+              value={ingestSource}
+              onChange={e => setIngestSource(e.target.value)}
+              className="px-3 py-2 text-sm bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+            >
+              <option value="manual">Manual Note</option>
+              <option value="email">Email (paste)</option>
+              <option value="voice">Voice Transcript</option>
+              <option value="imessage_auto">iMessage</option>
+              <option value="signal_forward">Signal</option>
+            </select>
+            <input
+              type="text"
+              value={ingestContactHint}
+              onChange={e => setIngestContactHint(e.target.value)}
+              placeholder="Contact name or email (optional)"
+              className="flex-1 px-3 py-2 text-sm bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          <textarea
+            value={ingestContent}
+            onChange={e => setIngestContent(e.target.value)}
+            placeholder="Paste email, meeting notes, text exchange, voice transcript..."
+            rows={6}
+            className="w-full px-3 py-2 text-sm bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-y"
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              Content will be analyzed by Claude and queued for review
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowIngestForm(false)}
+                className="px-3 py-2 text-sm text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleManualIngest}
+                disabled={ingestLoading || !ingestContent.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {ingestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {ingestLoading ? 'Processing...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Bar */}
       <div className="grid grid-cols-5 gap-3">

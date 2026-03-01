@@ -142,6 +142,21 @@ async function getDashboardData() {
     orderBy: { generatedAt: 'desc' },
   })
 
+  // Inbox pending count
+  const inboxPending = await prisma.ingestionItem.count({
+    where: { status: 'pending' },
+  })
+
+  // Latest 3 inbox items for preview
+  const inboxPreview = await prisma.ingestionItem.findMany({
+    where: { status: 'pending' },
+    orderBy: { createdAt: 'desc' },
+    take: 3,
+    include: {
+      contact: { select: { name: true } },
+    },
+  })
+
   const totalContacts = allContacts.length
   const overdueTier1 = overdueContacts.filter(c => c.tier === 1).length
   const overdueTier2 = overdueContacts.filter(c => c.tier === 2).length
@@ -158,6 +173,17 @@ async function getDashboardData() {
     contacted7d: contacted7d.length,
     contacted30d: contacted30d.length,
     outreachSentThisWeek,
+    inboxPending,
+    inboxPreview: inboxPreview.map(item => ({
+      id: item.id,
+      source: item.source,
+      itemType: item.itemType,
+      contactName: item.contact?.name || item.contactHint || 'Unknown',
+      summary: (() => {
+        try { return JSON.parse(item.extraction).summary?.slice(0, 100) || '' } catch { return '' }
+      })(),
+      createdAt: item.createdAt,
+    })),
     weeklyTrends,
     todaysMeetings,
     calendarLoad,

@@ -7,6 +7,7 @@ import {
   Calendar,
   CheckCircle,
   Clock,
+  Inbox,
   Mail,
   Radio,
   Send,
@@ -30,6 +31,15 @@ interface DashboardProps {
     overdueTier3: number
     openCommitmentsCount: number
     outreachReadyCount: number
+    inboxPending: number
+    inboxPreview: Array<{
+      id: string
+      source: string
+      itemType: string
+      contactName: string
+      summary: string
+      createdAt: string
+    }>
     contacted7d: number
     contacted30d: number
     outreachSentThisWeek: number
@@ -138,8 +148,54 @@ export function DashboardContent({ data }: DashboardProps) {
           <span className="text-red-600 font-medium">{data.overdueCount} overdue</span>
           <span className="text-amber-600 font-medium">{data.openCommitmentsCount} commitments</span>
           <span className="text-blue-600 font-medium">{data.outreachReadyCount} outreach ready</span>
+          {data.inboxPending > 0 && (
+            <Link href="/inbox" className="text-purple-600 font-medium hover:text-purple-700">
+              {data.inboxPending} inbox pending
+            </Link>
+          )}
         </div>
       </div>
+
+      {/* Inbox Widget */}
+      {data.inboxPending > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Inbox className="h-5 w-5 text-purple-600" />
+              Inbox
+              <span className="ml-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                {data.inboxPending} pending
+              </span>
+            </h2>
+            <Link href="/inbox" className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1">
+              Review all <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="grid gap-2">
+            {data.inboxPreview.map(item => (
+              <Link key={item.id} href="/inbox" className="rounded-lg border bg-white p-3 hover:bg-gray-50 transition-colors block">
+                <div className="flex items-center gap-3">
+                  <span className="rounded bg-purple-50 px-1.5 py-0.5 text-xs font-medium text-purple-600">
+                    {item.source === 'email' ? 'Email' : item.source === 'voice' ? 'Voice' : item.source === 'manual' ? 'Manual' : item.source}
+                  </span>
+                  <span className="text-sm font-medium text-gray-900">{item.contactName}</span>
+                  <span className="text-xs text-gray-400 ml-auto">
+                    {formatRelativeDate(item.createdAt)}
+                  </span>
+                </div>
+                {item.summary && (
+                  <p className="text-sm text-gray-500 mt-1 truncate">{item.summary}</p>
+                )}
+              </Link>
+            ))}
+            {data.inboxPending > 3 && (
+              <Link href="/inbox" className="text-center text-sm text-purple-600 hover:text-purple-700 py-2">
+                +{data.inboxPending - 3} more pending items
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Outreach Queue */}
       <section>

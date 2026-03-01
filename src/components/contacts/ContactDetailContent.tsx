@@ -111,9 +111,23 @@ interface Props {
     generatedAt: string
     meetingTitle: string | null
   } | null
+  dossier: {
+    id: string
+    version: number
+    content: string
+    updatedBy: string
+    createdAt: string
+  } | null
+  standingOffers: Array<{
+    id: string
+    description: string
+    offeredBy: string
+    originalWords: string
+    createdAt: string
+  }>
 }
 
-export function ContactDetailContent({ contact, relationships, relatedContacts, commitments, latestPrep }: Props) {
+export function ContactDetailContent({ contact, relationships, relatedContacts, commitments, latestPrep, dossier, standingOffers }: Props) {
   const router = useRouter()
 
   const openCommitments = commitments.filter(c => !c.fulfilled)
@@ -257,6 +271,9 @@ export function ContactDetailContent({ contact, relationships, relatedContacts, 
             </div>
           )}
 
+          {/* Dossier */}
+          <DossierSection contactId={contact.id} dossier={dossier} />
+
           {/* Meeting Prep Brief */}
           <ContactPrepSection contactId={contact.id} latestPrep={latestPrep} />
 
@@ -373,6 +390,29 @@ export function ContactDetailContent({ contact, relationships, relatedContacts, 
             </div>
           </div>
 
+          {/* Standing Offers */}
+          {standingOffers.length > 0 && (
+            <div className="rounded-lg border bg-white p-6">
+              <h3 className="text-xs font-semibold uppercase text-gray-400 mb-3">Standing Offers</h3>
+              <div className="space-y-3">
+                {standingOffers.map(offer => (
+                  <div key={offer.id} className="text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        'rounded px-1.5 py-0.5 text-xs',
+                        offer.offeredBy === 'me' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
+                      )}>
+                        {offer.offeredBy === 'me' ? 'I offered' : 'They offered'}
+                      </span>
+                    </div>
+                    <p className="text-gray-700 mt-1">{offer.description}</p>
+                    <p className="text-xs text-gray-400 italic mt-0.5">&ldquo;{offer.originalWords}&rdquo;</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Signals */}
           <div className="rounded-lg border bg-white p-6">
             <h3 className="text-xs font-semibold uppercase text-gray-400 mb-3">Intelligence Signals</h3>
@@ -444,6 +484,101 @@ export function ContactDetailContent({ contact, relationships, relatedContacts, 
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function DossierSection({
+  contactId,
+  dossier,
+}: {
+  contactId: string
+  dossier: Props['dossier']
+}) {
+  const [expanded, setExpanded] = useState(!!dossier)
+  const [content, setContent] = useState(dossier?.content || '')
+  const [version, setVersion] = useState(dossier?.version || 0)
+  const [updatedAt, setUpdatedAt] = useState(dossier?.createdAt || '')
+  const [generating, setGenerating] = useState(false)
+  const hasDossier = !!content
+
+  async function generateDossier(mode: 'full' | 'incremental' = 'full') {
+    setGenerating(true)
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/dossier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      })
+      const data = await res.json()
+      if (data.dossier) {
+        setContent(data.dossier.content)
+        setVersion(data.dossier.version)
+        setUpdatedAt(data.dossier.createdAt)
+        setExpanded(true)
+      }
+    } catch (error) {
+      console.error('Failed to generate dossier:', error)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border bg-white">
+      <div className="p-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <FileText className="h-4 w-4 text-blue-600" />
+            Intelligence Dossier
+            {version > 0 && (
+              <span className="text-xs text-gray-400 font-normal">v{version}</span>
+            )}
+          </h3>
+          <div className="flex gap-2">
+            {hasDossier && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+              >
+                {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {expanded ? 'Collapse' : 'Expand'}
+              </button>
+            )}
+            <button
+              onClick={() => generateDossier('full')}
+              disabled={generating}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50"
+            >
+              {generating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : hasDossier ? (
+                <RefreshCw className="h-3 w-3" />
+              ) : (
+                <FileText className="h-3 w-3" />
+              )}
+              {generating ? 'Synthesizing...' : hasDossier ? 'Regenerate' : 'Generate Dossier'}
+            </button>
+          </div>
+        </div>
+        {!hasDossier && !generating && (
+          <p className="text-sm text-gray-400 mt-2">Generate a comprehensive intelligence dossier for this contact</p>
+        )}
+      </div>
+      {expanded && content && (
+        <div className="border-t px-6 py-4 bg-blue-50/20">
+          {updatedAt && (
+            <p className="text-xs text-gray-400 mb-3">
+              Last updated {new Date(updatedAt).toLocaleString('en-US', {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+              })}
+            </p>
+          )}
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
+            {content}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }
