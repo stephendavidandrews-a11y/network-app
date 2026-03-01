@@ -230,6 +230,53 @@ export interface CommitmentRecord {
   urgency?: CommitmentUrgency
 }
 
+// ── Enrichment Types ──
+
+export type EnrichmentStatus = 'pending' | 'found' | 'not_found' | 'error' | 'approved' | 'rejected'
+
+export interface OrganizationDomainRecord {
+  id: string
+  organization: string
+  domain: string | null
+  resolvedBy: 'claude' | 'manual' | 'hunter'
+  confidence: 'high' | 'medium' | 'low'
+  notes: string | null
+  createdAt: string
+}
+
+export interface EnrichmentResultRecord {
+  id: string
+  contactId: string
+  source: 'hunter' | 'manual' | 'ingestion'
+  email: string | null
+  score: number | null
+  domain: string | null
+  rawResponse: string | null
+  status: EnrichmentStatus
+  reviewedAt: string | null
+  createdAt: string
+  contact?: {
+    id: string
+    name: string
+    organization: string | null
+    email: string | null
+    tier: number
+    strategicValue: number
+  }
+}
+
+export interface EnrichmentPipelineStats {
+  totalContacts: number
+  haveEmail: number
+  missingEmail: number
+  missingOrg: number
+  pendingDomainResolution: number
+  pendingEmailLookup: number
+  pendingReview: number
+  approved: number
+  rejected: number
+}
+
 // ── Voice Debrief Types ──
 
 export interface DebriefCommitment {

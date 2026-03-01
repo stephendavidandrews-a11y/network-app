@@ -46,6 +46,7 @@ model Contact {
   relationshipsAsB        ContactRelationship[] @relation("ContactB")
   meetingPreps            MeetingPrep[]
   commitmentRecords       Commitment[]
+  enrichmentResults       EnrichmentResult[]
 
   @@index([tier])
   @@index([status])
@@ -244,4 +245,35 @@ model Commitment {
   @@index([contactId])
   @@index([fulfilled, dueDate])
   @@map("commitments")
+}
+
+model OrganizationDomain {
+  id           String  @id @default(uuid())
+  organization String  @unique
+  domain       String?
+  resolvedBy   String  @default("manual") @map("resolved_by")
+  confidence   String  @default("high")
+  notes        String?
+  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  @@map("organization_domains")
+}
+
+model EnrichmentResult {
+  id           String  @id @default(uuid())
+  contactId    String  @map("contact_id")
+  source       String  @default("hunter")
+  email        String?
+  score        Int?
+  domain       String?
+  rawResponse  String? @map("raw_response")
+  status       String  @default("pending")
+  reviewedAt   String? @map("reviewed_at")
+  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact      Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([status])
+  @@map("enrichment_results")
 }

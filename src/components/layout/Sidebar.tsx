@@ -11,6 +11,7 @@ import {
   Radio,
   Network,
   CheckSquare,
+  Database,
   Settings,
   LogOut,
 } from 'lucide-react'
@@ -26,6 +27,7 @@ const navigation = [
   { name: 'Signals', href: '/signals', icon: Radio },
   { name: 'Network', href: '/network', icon: Network },
   { name: 'Commitments', href: '/commitments', icon: CheckSquare },
+  { name: 'Enrichment', href: '/contacts/enrich', icon: Database },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
@@ -48,7 +50,9 @@ export function Sidebar() {
           const isActive =
             item.href === '/'
               ? pathname === '/'
-              : pathname.startsWith(item.href)
+              : item.href === '/contacts'
+                ? pathname === '/contacts' || (pathname.startsWith('/contacts/') && !pathname.startsWith('/contacts/enrich'))
+                : pathname.startsWith(item.href)
 
           return (
             <Link
