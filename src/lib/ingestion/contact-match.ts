@@ -297,15 +297,3 @@ export async function isDuplicate(hash: string, threadId?: string): Promise<bool
   return false
 }
 
-/**
- * Detect if content is from a .gov address.
- */
-export function isGovSensitive(metadata?: {
-  originalFrom?: string
-  forwardedFrom?: string
-}): boolean {
-  if (!metadata) return false
-  const from = metadata.originalFrom || ''
-  const forwarded = metadata.forwardedFrom || ''
-  return from.includes('.gov') || forwarded.includes('.gov')
-}

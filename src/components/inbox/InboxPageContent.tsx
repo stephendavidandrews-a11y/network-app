@@ -14,7 +14,6 @@ import {
   Undo2,
   ChevronDown,
   ChevronUp,
-  Shield,
   Calendar,
   Users,
   Handshake,
@@ -22,7 +21,6 @@ import {
   Target,
   Heart,
   Briefcase,
-  AlertTriangle,
   Clock,
   CheckCircle,
   Loader2,
@@ -40,7 +38,6 @@ interface InboxItem {
   contactOrg: string | null
   contactTier: number | null
   status: string
-  sensitivityFlag: boolean
   clusterId: string | null
   autoHandled: boolean
   confidence: number | null
@@ -321,13 +318,11 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
   return (
     <div className={`rounded-lg border transition-colors ${
-      item.sensitivityFlag
-        ? 'bg-amber-900/10 border-amber-500/30'
-        : isPending
-          ? 'bg-slate-800/50 border-slate-700/50'
-          : isConfirmed
-            ? 'bg-green-900/10 border-green-500/20'
-            : 'bg-slate-800/30 border-slate-700/30'
+      isPending
+        ? 'bg-slate-800/50 border-slate-700/50'
+        : isConfirmed
+          ? 'bg-green-900/10 border-green-500/20'
+          : 'bg-slate-800/30 border-slate-700/30'
     }`}>
       {/* Header Row */}
       <div className="px-4 py-3 flex items-center gap-3 cursor-pointer" onClick={onToggle}>
@@ -337,14 +332,6 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
         <span className={`px-2 py-0.5 rounded text-xs font-medium border ${TYPE_COLORS[item.itemType] || TYPE_COLORS.interaction}`}>
           {TYPE_LABELS[item.itemType] || item.itemType}
         </span>
-
-        {/* Sensitivity Flag */}
-        {item.sensitivityFlag && (
-          <span className="px-2 py-0.5 rounded text-xs font-medium border text-amber-400 bg-amber-500/10 border-amber-500/30 flex items-center gap-1">
-            <Shield className="w-3 h-3" />
-            .gov
-          </span>
-        )}
 
         {/* Contact Name */}
         <div className="flex-1 min-w-0">
@@ -398,14 +385,6 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
       {/* Expanded Content */}
       {expanded && ext && (
         <div className="px-4 pb-4 border-t border-slate-700/50 space-y-4">
-          {/* Sensitivity Warning */}
-          {item.sensitivityFlag && (
-            <div className="mt-3 p-3 rounded bg-amber-500/10 border border-amber-500/20 text-sm text-amber-300 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              Forwarded from .gov address. Review for nonpublic information before confirming.
-            </div>
-          )}
-
           {/* Summary */}
           <div className="mt-3">
             <p className="text-sm text-slate-300 leading-relaxed">{ext.summary}</p>

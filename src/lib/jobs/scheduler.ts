@@ -6,6 +6,7 @@ import { generateDailyBriefing } from './daily-briefing'
 import { runDbBackup } from './db-backup'
 import { runCalendarSync } from './calendar-sync'
 import { runMeetingPrepGenerate } from './meeting-prep-generate'
+import { runEmailPoll } from './email-poll'
 
 let scheduled = false
 
@@ -72,6 +73,19 @@ export function startScheduler() {
     }
   })
 
+  // Email poll: every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('[Job] Running email poll...')
+    try {
+      const result = await runEmailPoll()
+      if (result.processed > 0 || result.errors > 0) {
+        console.log(`[Job] Email poll: ${result.processed} processed, ${result.skipped} skipped, ${result.errors} errors`)
+      }
+    } catch (error) {
+      console.error('[Job] Email poll failed:', error)
+    }
+  })
+
   // Database backup: daily at 2:00 AM
   cron.schedule('0 2 * * *', () => {
     console.log('[Job] Running database backup...')
@@ -83,5 +97,5 @@ export function startScheduler() {
     }
   })
 
-  console.log('[Scheduler] Jobs scheduled: db_backup(2AM), calendar_sync(5AM), score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6AM), meeting_prep(6:15AM)')
+  console.log('[Scheduler] Jobs scheduled: email_poll(*/5min), db_backup(2AM), calendar_sync(5AM), score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6AM), meeting_prep(6:15AM)')
 }

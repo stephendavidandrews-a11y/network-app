@@ -220,7 +220,6 @@ Return ONLY valid JSON matching this exact schema:
 - Standing offers are DIFFERENT from commitments — offers are open-ended, not time-bound
 - Asks are DIFFERENT from commitments — asks are requests without firm accountability
 - Calendar events are scheduled items; scheduling leads are soft intent ("let's meet soon")
-- For .gov-originated content, be extra careful about nonpublic government information
 - If the content is irrelevant, still return the full schema but with empty arrays and minimal summary
 - Do NOT include any text outside the JSON object`
 

@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { extractFromContent } from '@/lib/ingestion/extract'
-import { matchContact, contentHash, isDuplicate, isGovSensitive } from '@/lib/ingestion/contact-match'
+import { matchContact, contentHash, isDuplicate } from '@/lib/ingestion/contact-match'
 import type { IngestRequest, IngestionSource } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -231,9 +231,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ── Sensitivity Detection ──
-    const sensitivityFlag = isGovSensitive(parsedMetadata)
-
     // ── Contact Matching ──
     const match = await matchContact(contactHint, {
       originalFrom: parsedMetadata.originalFrom,
@@ -278,18 +275,17 @@ export async function POST(request: NextRequest) {
       data: {
         source,
         itemType: extraction.itemType,
-        rawContent: sensitivityFlag ? '[REDACTED — .gov source]' : processedContent,
+        rawContent: processedContent,
         contactId: match.contactId,
         contactHint: contactHint || parsedMetadata.originalFrom || null,
         extraction: JSON.stringify(extraction),
         status: 'pending',
-        sensitivityFlag,
         contentHash: hash,
         threadId: metadata?.threadId || null,
       },
     })
 
-    console.log(`[Ingestion] Item created: ${item.id} | source=${source} | type=${extraction.itemType} | contact=${match.contactName || 'unknown'} | sensitive=${sensitivityFlag}`)
+    console.log(`[Ingestion] Item created: ${item.id} | source=${source} | type=${extraction.itemType} | contact=${match.contactName || 'unknown'}`)
 
     return NextResponse.json({
       id: item.id,
@@ -297,7 +293,6 @@ export async function POST(request: NextRequest) {
       contactMatch: match.contactName
         ? { name: match.contactName, method: match.matchMethod, confidence: match.confidence }
         : null,
-      sensitivityFlag,
       summary: extraction.summary.slice(0, 200),
     })
   } catch (error) {

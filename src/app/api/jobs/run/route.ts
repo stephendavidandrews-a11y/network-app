@@ -6,6 +6,7 @@ import { generateDailyBriefing } from '@/lib/jobs/daily-briefing'
 import { runDbBackup } from '@/lib/jobs/db-backup'
 import { runCalendarSync } from '@/lib/jobs/calendar-sync'
 import { runMeetingPrepGenerate } from '@/lib/jobs/meeting-prep-generate'
+import { runEmailPoll } from '@/lib/jobs/email-poll'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
@@ -31,6 +32,10 @@ export async function POST(request: NextRequest) {
       }
       case 'meeting_prep': {
         const result = await runMeetingPrepGenerate(prisma)
+        return NextResponse.json({ job, result })
+      }
+      case 'email_poll': {
+        const result = await runEmailPoll()
         return NextResponse.json({ job, result })
       }
       case 'all': {
