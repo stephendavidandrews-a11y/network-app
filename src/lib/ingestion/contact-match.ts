@@ -21,15 +21,28 @@ interface MatchResult {
 
 /**
  * Normalize a name for fuzzy matching:
- * strip titles, lowercase, remove non-alpha chars
+ * strip titles, parenthetical suffixes (dept codes), lowercase, remove non-alpha chars.
+ * Also converts "Last, First" → "First Last".
  */
 function normalizeName(name: string): string {
-  return name
+  let n = name
+    // Strip parenthetical suffixes like (NSD), (ENRD), (DOJ)
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
     .toLowerCase()
     .replace(/\b(jr|sr|dr|mr|mrs|ms|esq|phd|md|ii|iii|iv)\b\.?/gi, '')
-    .replace(/[^a-z\s]/g, '')
+    .replace(/[^a-z,\s]/g, '')
     .trim()
     .replace(/\s+/g, ' ')
+
+  // Handle "Last, First" → "First Last"
+  if (n.includes(',')) {
+    const parts = n.split(',').map(p => p.trim()).filter(Boolean)
+    if (parts.length === 2) {
+      n = `${parts[1]} ${parts[0]}`
+    }
+  }
+
+  return n.replace(/,/g, '').trim()
 }
 
 /**

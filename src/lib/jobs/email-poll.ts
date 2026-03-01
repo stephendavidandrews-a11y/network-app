@@ -40,37 +40,120 @@ function parseEmail(text: string): {
   let subject: string | null = null
 
   // Detect forwarded email markers
+  // Strategy: try exact string patterns first, then regex fallbacks for
+  // Gmail's various forwarding formats (including quoted-printable artifacts)
   const fwdPatterns = [
     '---------- Forwarded message ----------',
+    '---------- Forwarded message ---------',   // quoted-printable may truncate
     '-----Original Message-----',
     '--- Forwarded message ---',
   ]
 
+  let fwdDetected = false
+
   for (const pattern of fwdPatterns) {
     const idx = text.indexOf(pattern)
     if (idx !== -1) {
-      const afterMarker = text.substring(idx + pattern.length)
-      const lines = afterMarker.split('\n')
-      let bodyStart = 0
+      const afterMarker = text.substring(idx + pattern.length).trim()
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim()
-        if (line === '') {
-          bodyStart = i + 1
-          break
+      // Check if we have proper newlines (multi-line) or collapsed single-line text
+      const hasNewlines = afterMarker.includes('\n')
+
+      if (hasNewlines) {
+        // Multi-line: parse headers line by line (original logic)
+        const lines = afterMarker.split('\n')
+        let bodyStart = 0
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim()
+          if (line === '') {
+            bodyStart = i + 1
+            break
+          }
+          const headerMatch = line.match(/^(From|To|Date|Subject|Cc):\s*(.+)/i)
+          if (headerMatch) {
+            const key = headerMatch[1].toLowerCase()
+            const val = headerMatch[2].trim()
+            if (key === 'from') from = val
+            if (key === 'to') to = val
+            if (key === 'subject') subject = val
+          }
         }
-        const match = line.match(/^(From|To|Date|Subject|Cc):\s*(.+)/i)
-        if (match) {
-          const key = match[1].toLowerCase()
-          const val = match[2].trim()
-          if (key === 'from') from = val
-          if (key === 'to') to = val
-          if (key === 'subject') subject = val
+
+        body = lines.slice(bodyStart).join('\n').trim()
+      } else {
+        // Single-line (HTML was stripped + whitespace collapsed): use regex extraction
+        const fromMatch = afterMarker.match(/From:\s*(.*?)(?=\s+Date:)/i)
+        const toMatch = afterMarker.match(/\bTo:\s*(.*?)(?=\s+(?:Cc|Subject|Date):|\s{2,})/i)
+        const subjectMatch = afterMarker.match(/Subject:\s*(.*?)(?=\s+(?:To|Cc|From):|\s{2,})/i)
+
+        if (fromMatch) from = fromMatch[1].trim()
+        if (toMatch) to = toMatch[1].trim()
+        if (subjectMatch) subject = subjectMatch[1].trim()
+
+        // Find body after headers
+        const allHeaders = Array.from(afterMarker.matchAll(/\b(From|Date|Subject|To|Cc):\s*/gi))
+        if (allHeaders.length > 0) {
+          const lastHeader = allHeaders[allHeaders.length - 1]
+          const afterLastHeader = afterMarker.substring(lastHeader.index! + lastHeader[0].length)
+          // Look for body start: greeting or sentence-like text
+          const bodyStartMatch = afterLastHeader.match(/(?:^|\s)(Hi\b|Hello\b|Dear\b|Good\s|Thank|I\s(?:am|hope|want|would|was)|Please\b|Hope\b|Just\b|Following\b|As\b|Per\b|We\b|This\b)/i)
+          if (bodyStartMatch && bodyStartMatch.index != null) {
+            body = afterLastHeader.substring(bodyStartMatch.index).trim()
+          } else {
+            body = afterLastHeader
+          }
         }
       }
 
-      body = lines.slice(bodyStart).join('\n').trim()
+      fwdDetected = true
       break
+    }
+  }
+
+  // Fallback: Gmail compact forwarding format
+  // After HTML stripping + whitespace collapse, Gmail forwards look like:
+  // "------ From: Name (Dept) Date: Tue, Feb 24, 2026 at 3:43 PM Subject: Title To: email Cc: ... Body text here"
+  // Everything on one line because newlines were collapsed.
+  // Also handles multi-line case where newlines are preserved.
+  if (!fwdDetected) {
+    const gmailCompactMatch = text.match(/-{3,}\s*From:\s*/m)
+    if (gmailCompactMatch && gmailCompactMatch.index != null) {
+      const afterDashes = text.substring(gmailCompactMatch.index)
+
+      // Extract headers using regex — works for both collapsed single-line and multi-line
+      // Each header value runs until the next recognized header keyword or end of headers
+      const fromMatch = afterDashes.match(/From:\s*(.*?)(?=\s+Date:)/i)
+      const toMatch = afterDashes.match(/\bTo:\s*(.*?)(?=\s+(?:Cc|Subject|Date):|\s{2,})/i)
+      const subjectMatch = afterDashes.match(/Subject:\s*(.*?)(?=\s+(?:To|Cc|From):|\s{2,})/i)
+
+      if (fromMatch) from = fromMatch[1].trim()
+      if (toMatch) to = toMatch[1].trim()
+      if (subjectMatch) subject = subjectMatch[1].trim()
+
+      // Find body: everything after the last header
+      // Find all known header keywords, take the last one's end position
+      const allHeaders = Array.from(afterDashes.matchAll(/\b(From|Date|Subject|To|Cc):\s*/gi))
+      if (allHeaders.length > 0) {
+        const lastHeader = allHeaders[allHeaders.length - 1]
+        const lastHeaderStart = lastHeader.index! + lastHeader[0].length
+
+        // After the last header keyword, find where the header value ends and body begins
+        // For Cc: it's a list of names/emails. Body typically starts with a greeting or sentence.
+        // Heuristic: find the first sentence-like text after the last header
+        const afterLastHeader = afterDashes.substring(lastHeaderStart)
+
+        // Look for common greeting/body starters
+        const bodyStartMatch = afterLastHeader.match(/(?:^|\s)(Hi\b|Hello\b|Dear\b|Good\s|Thank|I\s(?:am|hope|want|would|was)|Please\b|Hope\b|Just\b|Following\b|As\b|Per\b|We\b|This\b)/i)
+        if (bodyStartMatch && bodyStartMatch.index != null) {
+          body = afterLastHeader.substring(bodyStartMatch.index).trim()
+        } else {
+          // Fallback: skip a reasonable amount and take the rest
+          body = afterLastHeader
+        }
+      }
+
+      fwdDetected = true
     }
   }
 
@@ -212,6 +295,8 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
           // Parse the email content
           const parsed = parseEmail(textContent)
 
+          console.log(`[EmailPoll] UID ${uid} parsed: from=${parsed.from}, to=${parsed.to}, subject=${parsed.subject}`)
+
           // Build metadata from envelope + parsed headers
           const fromAddr = parsed.from ||
             (env?.from?.[0] ? `${env.from[0].name || ''} <${env.from[0].address}>`.trim() : null)
@@ -219,6 +304,8 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
           const contactHint = fromAddr
             ? extractName(fromAddr) || extractEmail(fromAddr)
             : undefined
+
+          console.log(`[EmailPoll] UID ${uid} contactHint=${contactHint}, fromAddr=${fromAddr}`)
 
           const processResult = await processIngestion({
             source: 'email',
