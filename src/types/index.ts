@@ -194,3 +194,26 @@ export interface CalendarDayData {
 }
 
 export type CalendarLoad = 'light' | 'normal' | 'heavy'
+
+// ── Meeting Prep Types ──
+
+export interface MeetingPrepRecord {
+  id: string
+  date: string
+  contactId: string
+  calendarEventId: string | null
+  meetingTitle: string | null
+  briefContent: string
+  generatedAt: string
+}
+
+// ── Voice Debrief Types ──
+
+export interface DebriefExtraction {
+  summary: string
+  commitments: Array<{ description: string; dueDate: string | null }>
+  newContactsMentioned: Array<{ name: string; org: string | null; context: string }>
+  followUps: Array<{ description: string }>
+  relationshipNotes: string
+  topicsDiscussed: string[]
+}

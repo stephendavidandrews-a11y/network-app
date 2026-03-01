@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { DashboardContent } from '@/components/dashboard/DashboardContent'
 import { classifyCalendarLoad } from '@/lib/calendar'
-import type { CalendarMeeting, CalendarLoad } from '@/types'
+import type { CalendarMeeting, CalendarLoad, MeetingPrepRecord } from '@/types'
 
 async function getDashboardData() {
   const today = new Date().toISOString().split('T')[0]
@@ -130,6 +130,12 @@ async function getDashboardData() {
     } catch { /* skip invalid cache */ }
   }
 
+  // Fetch today's meeting prep briefs
+  const meetingPreps = await prisma.meetingPrep.findMany({
+    where: { date: today },
+    orderBy: { generatedAt: 'desc' },
+  })
+
   const totalContacts = allContacts.length
   const overdueTier1 = overdueContacts.filter(c => c.tier === 1).length
   const overdueTier2 = overdueContacts.filter(c => c.tier === 2).length
@@ -150,6 +156,15 @@ async function getDashboardData() {
     todaysMeetings,
     calendarLoad,
     calendarMeetingCount,
+    meetingPreps: meetingPreps.map(p => ({
+      id: p.id,
+      date: p.date,
+      contactId: p.contactId,
+      calendarEventId: p.calendarEventId,
+      meetingTitle: p.meetingTitle,
+      briefContent: p.briefContent,
+      generatedAt: p.generatedAt,
+    })) as MeetingPrepRecord[],
     recentSignals: recentSignals.map(s => ({
       ...s,
       contactName: s.contact.name,

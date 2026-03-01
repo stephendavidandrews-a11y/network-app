@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { TIER_COLORS, STATUS_COLORS } from '@/lib/constants'
 import { formatRelativeDate, formatDate } from '@/lib/utils'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { MeetingPrepCard } from './MeetingPrepCard'
 
 interface DashboardProps {
   data: {
@@ -45,6 +46,15 @@ interface DashboardProps {
     }>
     calendarLoad: 'light' | 'normal' | 'heavy'
     calendarMeetingCount: number
+    meetingPreps: Array<{
+      id: string
+      date: string
+      contactId: string
+      calendarEventId: string | null
+      meetingTitle: string | null
+      briefContent: string
+      generatedAt: string
+    }>
     recentSignals: Array<{
       id: string
       signalType: string
@@ -204,41 +214,18 @@ export function DashboardContent({ data }: DashboardProps) {
           </div>
         ) : (
           <div className="grid gap-3">
-            {data.todaysMeetings.map((meeting) => (
-              <div key={meeting.id} className="rounded-lg border bg-white p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-400">
-                        {formatMeetingTime(meeting.start)} – {formatMeetingTime(meeting.end)}
-                      </span>
-                      <span className="font-medium text-gray-900">{meeting.summary}</span>
-                    </div>
-                    {meeting.matchedContactName && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={cn('inline-flex h-5 items-center rounded border px-1.5 text-xs font-medium', TIER_COLORS[meeting.matchedContactTier || 3])}>
-                          T{meeting.matchedContactTier}
-                        </span>
-                        <Link href={`/contacts/${meeting.matchedContactId}`} className="text-sm text-blue-600 hover:text-blue-700">
-                          {meeting.matchedContactName}
-                        </Link>
-                      </div>
-                    )}
-                    {meeting.linkedEventName && (
-                      <p className="mt-1 text-xs text-indigo-600">
-                        Also at tracked event:{' '}
-                        <Link href={`/events/${meeting.linkedEventId}`} className="underline hover:text-indigo-700">
-                          {meeting.linkedEventName}
-                        </Link>
-                      </p>
-                    )}
-                    {meeting.location && (
-                      <p className="mt-0.5 text-xs text-gray-400">{meeting.location}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {data.todaysMeetings.map((meeting) => {
+              const prep = data.meetingPreps.find(
+                p => p.contactId === meeting.matchedContactId || p.calendarEventId === meeting.id
+              )
+              return (
+                <MeetingPrepCard
+                  key={meeting.id}
+                  meeting={meeting}
+                  existingPrep={prep ? { id: prep.id, briefContent: prep.briefContent, generatedAt: prep.generatedAt } : null}
+                />
+              )
+            })}
           </div>
         )}
       </section>
@@ -466,14 +453,6 @@ export function DashboardContent({ data }: DashboardProps) {
       </div>
     </div>
   )
-}
-
-function formatMeetingTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
 }
 
 function MetricCard({

@@ -47,6 +47,16 @@ export default async function ContactDetailPage({
       })
     : []
 
+  // Fetch most recent meeting prep for this contact (today or yesterday)
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const latestPrep = await prisma.meetingPrep.findFirst({
+    where: {
+      contactId: params.id,
+      date: { gte: yesterday },
+    },
+    orderBy: { generatedAt: 'desc' },
+  })
+
   const enriched = {
     ...contact,
     categories: JSON.parse(contact.categories || '[]') as string[],
@@ -69,6 +79,12 @@ export default async function ContactDetailPage({
       contact={enriched}
       relationships={relationships}
       relatedContacts={relatedContacts}
+      latestPrep={latestPrep ? {
+        id: latestPrep.id,
+        briefContent: latestPrep.briefContent,
+        generatedAt: latestPrep.generatedAt,
+        meetingTitle: latestPrep.meetingTitle,
+      } : null}
     />
   )
 }

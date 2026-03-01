@@ -2,16 +2,23 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import {
   ArrowLeft,
   Calendar,
+  ChevronDown,
+  ChevronUp,
   Edit,
   ExternalLink,
+  FileText,
   Globe,
   Linkedin,
+  Loader2,
   Mail,
   MessageSquare,
+  Mic,
   Phone,
+  RefreshCw,
   Send,
   Twitter,
   Users,
@@ -85,9 +92,15 @@ interface Props {
     organization: string | null
     tier: number
   }>
+  latestPrep: {
+    id: string
+    briefContent: string
+    generatedAt: string
+    meetingTitle: string | null
+  } | null
 }
 
-export function ContactDetailContent({ contact, relationships, relatedContacts }: Props) {
+export function ContactDetailContent({ contact, relationships, relatedContacts, latestPrep }: Props) {
   const router = useRouter()
 
   const openCommitments = contact.interactions
@@ -193,6 +206,9 @@ export function ContactDetailContent({ contact, relationships, relatedContacts }
               </div>
             </div>
           )}
+
+          {/* Meeting Prep Brief */}
+          <ContactPrepSection contactId={contact.id} latestPrep={latestPrep} />
 
           {/* Interaction Timeline */}
           <div className="rounded-lg border bg-white p-6">
@@ -378,6 +394,96 @@ export function ContactDetailContent({ contact, relationships, relatedContacts }
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ContactPrepSection({
+  contactId,
+  latestPrep,
+}: {
+  contactId: string
+  latestPrep: Props['latestPrep']
+}) {
+  const [expanded, setExpanded] = useState(!!latestPrep)
+  const [briefContent, setBriefContent] = useState(latestPrep?.briefContent || '')
+  const [generatedAt, setGeneratedAt] = useState(latestPrep?.generatedAt || '')
+  const [generating, setGenerating] = useState(false)
+  const hasBrief = !!briefContent
+
+  async function generatePrep() {
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/meetings/prep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId }),
+      })
+      const data = await res.json()
+      if (data.prep) {
+        setBriefContent(data.prep.briefContent)
+        setGeneratedAt(data.prep.generatedAt)
+        setExpanded(true)
+      }
+    } catch (error) {
+      console.error('Failed to generate prep:', error)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border bg-white">
+      <div className="p-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <FileText className="h-4 w-4 text-indigo-600" />
+            Meeting Prep
+          </h3>
+          <div className="flex gap-2">
+            {hasBrief && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+              >
+                {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {expanded ? 'Collapse' : 'Expand'}
+              </button>
+            )}
+            <button
+              onClick={generatePrep}
+              disabled={generating}
+              className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+            >
+              {generating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : hasBrief ? (
+                <RefreshCw className="h-3 w-3" />
+              ) : (
+                <FileText className="h-3 w-3" />
+              )}
+              {generating ? 'Generating...' : hasBrief ? 'Regenerate' : 'Generate Prep'}
+            </button>
+          </div>
+        </div>
+        {!hasBrief && !generating && (
+          <p className="text-sm text-gray-400 mt-2">Generate a prep brief before your next meeting with this contact</p>
+        )}
+      </div>
+      {expanded && briefContent && (
+        <div className="border-t px-6 py-4 bg-indigo-50/30">
+          {generatedAt && (
+            <p className="text-xs text-gray-400 mb-2">
+              Generated {new Date(generatedAt).toLocaleString('en-US', {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+              })}
+            </p>
+          )}
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
+            {briefContent}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { InteractionFormPage } from '@/components/interactions/InteractionFormPa
 export default async function NewInteractionPage({
   searchParams,
 }: {
-  searchParams: { contact?: string }
+  searchParams: { contact?: string; mode?: string }
 }) {
   const contacts = await prisma.contact.findMany({
     orderBy: { name: 'asc' },
@@ -15,6 +15,7 @@ export default async function NewInteractionPage({
     <InteractionFormPage
       contacts={contacts}
       preselectedContactId={searchParams.contact}
+      initialMode={searchParams.mode}
     />
   )
 }

@@ -37,6 +37,7 @@
     "next-auth": "^4.24.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.7",
+    "openai": "^6.25.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-force-graph-2d": "^1.29.1",

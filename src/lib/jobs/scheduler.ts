@@ -5,6 +5,7 @@ import { runCadenceCheck } from './cadence-check'
 import { generateDailyBriefing } from './daily-briefing'
 import { runDbBackup } from './db-backup'
 import { runCalendarSync } from './calendar-sync'
+import { runMeetingPrepGenerate } from './meeting-prep-generate'
 
 let scheduled = false
 
@@ -60,6 +61,17 @@ export function startScheduler() {
     }
   })
 
+  // Meeting prep generation: daily at 6:15 AM (after briefing, after calendar sync)
+  cron.schedule('15 6 * * *', async () => {
+    console.log('[Job] Generating meeting prep briefs...')
+    try {
+      const result = await runMeetingPrepGenerate(prisma)
+      console.log(`[Job] Meeting prep complete: ${result.generated} briefs generated, ${result.skipped} skipped`)
+    } catch (error) {
+      console.error('[Job] Meeting prep generation failed:', error)
+    }
+  })
+
   // Database backup: daily at 2:00 AM
   cron.schedule('0 2 * * *', () => {
     console.log('[Job] Running database backup...')
@@ -71,5 +83,5 @@ export function startScheduler() {
     }
   })
 
-  console.log('[Scheduler] Jobs scheduled: db_backup(2AM), calendar_sync(5AM), score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6AM)')
+  console.log('[Scheduler] Jobs scheduled: db_backup(2AM), calendar_sync(5AM), score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6AM), meeting_prep(6:15AM)')
 }

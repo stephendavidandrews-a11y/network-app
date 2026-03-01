@@ -44,6 +44,7 @@ model Contact {
   outreachItems           OutreachQueue[]
   relationshipsAsA        ContactRelationship[] @relation("ContactA")
   relationshipsAsB        ContactRelationship[] @relation("ContactB")
+  meetingPreps            MeetingPrep[]
 
   @@index([tier])
   @@index([status])
@@ -195,6 +196,22 @@ model AppSetting {
   updatedAt String   @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
   @@map("app_settings")
+}
+
+model MeetingPrep {
+  id              String  @id @default(uuid())
+  date            String
+  contactId       String  @map("contact_id")
+  calendarEventId String? @map("calendar_event_id")
+  meetingTitle    String? @map("meeting_title")
+  briefContent    String  @map("brief_content")
+  generatedAt     String  @default(dbgenerated("(datetime('now'))")) @map("generated_at")
+
+  contact         Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([contactId, date])
+  @@map("meeting_preps")
 }
 
 model CalendarCache {

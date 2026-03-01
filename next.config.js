@@ -3,6 +3,9 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['bcryptjs', 'node-cron'],
     instrumentationHook: true,
+    serverActions: {
+      bodySizeLimit: '30mb',
+    },
   },
 }
 
