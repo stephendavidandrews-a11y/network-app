@@ -424,10 +424,10 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
   return (
     <div className={`rounded-lg border transition-colors ${
       isPending
-        ? 'bg-slate-800/50 border-slate-700/50'
+        ? 'bg-slate-800/70 border-blue-500/30'
         : isConfirmed
-          ? 'bg-green-900/10 border-green-500/20'
-          : 'bg-slate-800/30 border-slate-700/30'
+          ? 'bg-slate-800/50 border-green-500/30'
+          : 'bg-slate-800/40 border-slate-700/30 opacity-75'
     }`}>
       {/* Header Row */}
       <div className="px-4 py-3 flex items-center gap-3 cursor-pointer" onClick={onToggle}>
@@ -489,10 +489,10 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
       {/* Expanded Content */}
       {expanded && ext && (
-        <div className="px-4 pb-4 border-t border-slate-700/50 space-y-4">
+        <div className="px-4 pb-4 border-t border-slate-700/40 space-y-4">
           {/* Summary */}
           <div className="mt-3">
-            <p className="text-sm text-slate-300 leading-relaxed">{ext.summary}</p>
+            <p className="text-sm text-slate-200 leading-relaxed">{ext.summary}</p>
             <div className="flex items-center gap-3 mt-2">
               {ext.sentiment && (
                 <span className={`text-xs ${SENTIMENT_COLORS[ext.sentiment]}`}>
@@ -729,7 +729,7 @@ function ExtractSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/30">
+    <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/40">
       <div className={`flex items-center gap-2 mb-2 ${color}`}>
         <Icon className="w-4 h-4" />
         <span className="text-xs font-medium uppercase tracking-wider">{title}</span>
