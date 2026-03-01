@@ -76,10 +76,10 @@ const SOURCE_LABELS: Record<string, string> = {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  interaction: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-  intelligence_signal: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
-  scheduling: 'text-green-400 bg-green-500/10 border-green-500/30',
-  irrelevant: 'text-gray-400 bg-gray-500/10 border-gray-500/30',
+  interaction: 'text-blue-700 bg-blue-50 border-blue-200',
+  intelligence_signal: 'text-purple-700 bg-purple-50 border-purple-200',
+  scheduling: 'text-green-700 bg-green-50 border-green-200',
+  irrelevant: 'text-gray-500 bg-gray-50 border-gray-200',
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -90,11 +90,11 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const SENTIMENT_COLORS: Record<string, string> = {
-  warm: 'text-orange-400',
-  neutral: 'text-gray-400',
-  transactional: 'text-blue-400',
-  tense: 'text-red-400',
-  enthusiastic: 'text-green-400',
+  warm: 'text-orange-600',
+  neutral: 'text-gray-500',
+  transactional: 'text-blue-600',
+  tense: 'text-red-600',
+  enthusiastic: 'text-green-600',
 }
 
 export function InboxPageContent() {
@@ -243,7 +243,7 @@ export function InboxPageContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     )
   }
@@ -253,10 +253,10 @@ export function InboxPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Inbox className="w-7 h-7 text-blue-400" />
-          <h1 className="text-2xl font-bold text-white">Inbox</h1>
+          <Inbox className="w-7 h-7 text-blue-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Inbox</h1>
           {stats.pending > 0 && (
-            <span className="px-2.5 py-0.5 rounded-full text-sm font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+            <span className="px-2.5 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-700 border border-blue-200">
               {stats.pending} pending
             </span>
           )}
@@ -264,10 +264,10 @@ export function InboxPageContent() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowIngestForm(!showIngestForm)}
-            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
               showIngestForm
                 ? 'text-white bg-blue-600 hover:bg-blue-700'
-                : 'text-slate-300 bg-slate-700/50 hover:bg-slate-700'
+                : 'text-gray-700 border border-gray-200 hover:bg-gray-50'
             }`}
           >
             <Plus className="w-4 h-4" />
@@ -276,7 +276,7 @@ export function InboxPageContent() {
           {filter === 'pending' && items.length > 1 && (
             <button
               onClick={handleBatchConfirm}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+              className="px-4 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
             >
               Confirm All ({items.filter(i => i.extraction?.itemType !== 'irrelevant').length})
             </button>
@@ -286,12 +286,12 @@ export function InboxPageContent() {
 
       {/* Manual Ingest Form */}
       {showIngestForm && (
-        <div className="rounded-lg border border-blue-500/30 bg-slate-800/50 p-4 space-y-3">
+        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 space-y-3">
           <div className="flex items-center gap-3">
             <select
               value={ingestSource}
               onChange={e => setIngestSource(e.target.value)}
-              className="px-3 py-2 text-sm bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="manual">Manual Note</option>
               <option value="email">Email (paste)</option>
@@ -304,7 +304,7 @@ export function InboxPageContent() {
               value={ingestContactHint}
               onChange={e => setIngestContactHint(e.target.value)}
               placeholder="Contact name or email (optional)"
-              className="flex-1 px-3 py-2 text-sm bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="flex-1 px-3 py-2 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <textarea
@@ -312,23 +312,23 @@ export function InboxPageContent() {
             onChange={e => setIngestContent(e.target.value)}
             placeholder="Paste email, meeting notes, text exchange, voice transcript..."
             rows={6}
-            className="w-full px-3 py-2 text-sm bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-y"
+            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
           />
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-gray-500">
               Content will be analyzed by Claude and queued for review
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowIngestForm(false)}
-                className="px-3 py-2 text-sm text-slate-400 hover:text-white"
+                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
               >
                 Cancel
               </button>
               <button
                 onClick={handleManualIngest}
                 disabled={ingestLoading || !ingestContent.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {ingestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 {ingestLoading ? 'Processing...' : 'Submit'}
@@ -341,29 +341,29 @@ export function InboxPageContent() {
       {/* Stats Bar */}
       <div className="grid grid-cols-5 gap-3">
         {[
-          { label: 'Pending', value: stats.pending, color: 'text-blue-400', key: 'pending' as const },
-          { label: 'Confirmed', value: stats.confirmed + stats.edited, color: 'text-green-400', key: 'confirmed' as const },
-          { label: 'Dismissed', value: stats.dismissed, color: 'text-gray-400', key: 'dismissed' as const },
-          { label: 'Auto-handled', value: stats.auto_handled, color: 'text-purple-400', key: 'all' as const },
-          { label: 'Total', value: stats.pending + stats.confirmed + stats.dismissed + stats.edited + stats.auto_handled, color: 'text-white', key: 'all' as const },
+          { label: 'Pending', value: stats.pending, color: 'text-blue-600', key: 'pending' as const },
+          { label: 'Confirmed', value: stats.confirmed + stats.edited, color: 'text-green-600', key: 'confirmed' as const },
+          { label: 'Dismissed', value: stats.dismissed, color: 'text-gray-500', key: 'dismissed' as const },
+          { label: 'Auto-handled', value: stats.auto_handled, color: 'text-purple-600', key: 'all' as const },
+          { label: 'Total', value: stats.pending + stats.confirmed + stats.dismissed + stats.edited + stats.auto_handled, color: 'text-gray-900', key: 'all' as const },
         ].map(stat => (
           <button
             key={stat.label}
             onClick={() => setFilter(stat.key)}
             className={`p-3 rounded-lg border transition-colors ${
               filter === stat.key
-                ? 'bg-slate-700/60 border-slate-500'
-                : 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600'
+                ? 'bg-white border-blue-300 shadow-sm ring-1 ring-blue-100'
+                : 'bg-white border-gray-200 hover:border-gray-300'
             }`}
           >
             <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-            <div className="text-xs text-slate-400">{stat.label}</div>
+            <div className="text-xs text-gray-500">{stat.label}</div>
           </button>
         ))}
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
           {error}
           <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
         </div>
@@ -371,12 +371,12 @@ export function InboxPageContent() {
 
       {/* Items List */}
       {items.length === 0 ? (
-        <div className="text-center py-16 text-slate-500">
+        <div className="text-center py-16 text-gray-400">
           <Inbox className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p className="text-lg">No {filter} items</p>
-          <p className="text-sm mt-1">
+          <p className="text-lg text-gray-500">No {filter} items</p>
+          <p className="text-sm mt-1 text-gray-400">
             {filter === 'pending'
-              ? 'Forward emails to notes@ or add items via /api/ingest'
+              ? 'Forward emails to notes@ or use Add Note above'
               : `No ${filter} items yet`}
           </p>
         </div>
@@ -422,16 +422,16 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
   const isConfirmed = item.status === 'confirmed' || item.status === 'edited'
 
   return (
-    <div className={`rounded-lg border transition-colors ${
+    <div className={`rounded-lg border transition-colors bg-white ${
       isPending
-        ? 'bg-slate-800/70 border-blue-500/30'
+        ? 'border-blue-200 shadow-sm'
         : isConfirmed
-          ? 'bg-slate-800/50 border-green-500/30'
-          : 'bg-slate-800/40 border-slate-700/30 opacity-75'
+          ? 'border-green-200'
+          : 'border-gray-200 opacity-75'
     }`}>
       {/* Header Row */}
-      <div className="px-4 py-3 flex items-center gap-3 cursor-pointer" onClick={onToggle}>
-        <SourceIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+      <div className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-t-lg" onClick={onToggle}>
+        <SourceIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
 
         {/* Type Badge */}
         <span className={`px-2 py-0.5 rounded text-xs font-medium border ${TYPE_COLORS[item.itemType] || TYPE_COLORS.interaction}`}>
@@ -441,15 +441,15 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
         {/* Contact Name */}
         <div className="flex-1 min-w-0">
           {item.contactName ? (
-            <span className="text-sm font-medium text-white">
+            <span className="text-sm font-medium text-gray-900">
               {item.contactId ? (
-                <Link href={`/contacts/${item.contactId}`} className="hover:text-blue-400" onClick={e => e.stopPropagation()}>
+                <Link href={`/contacts/${item.contactId}`} className="hover:text-blue-600" onClick={e => e.stopPropagation()}>
                   {item.contactName}
                 </Link>
               ) : (
                 item.contactName
               )}
-              {item.contactOrg && <span className="text-slate-400 ml-1">({item.contactOrg})</span>}
+              {item.contactOrg && <span className="text-gray-500 ml-1">({item.contactOrg})</span>}
               {item.contactTier && (
                 <span className={`ml-2 px-1.5 py-0.5 rounded text-xs border ${TIER_COLORS[item.contactTier]}`}>
                   T{item.contactTier}
@@ -457,7 +457,7 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
               )}
             </span>
           ) : (
-            <span className="text-sm text-slate-400 italic">
+            <span className="text-sm text-gray-400 italic">
               {item.contactHint || 'Unknown contact'}
             </span>
           )}
@@ -465,45 +465,45 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
         {/* Summary Preview (collapsed) */}
         {!expanded && ext?.summary && (
-          <span className="text-sm text-slate-500 truncate max-w-[300px] hidden lg:inline">
+          <span className="text-sm text-gray-400 truncate max-w-[300px] hidden lg:inline">
             {ext.summary.slice(0, 100)}...
           </span>
         )}
 
         {/* Source Label + Time */}
-        <span className="text-xs text-slate-500 flex-shrink-0">
+        <span className="text-xs text-gray-400 flex-shrink-0">
           {SOURCE_LABELS[item.source]} · {formatTime(item.createdAt)}
         </span>
 
         {/* Status Indicator */}
-        {isConfirmed && <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />}
-        {item.status === 'dismissed' && <X className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+        {isConfirmed && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+        {item.status === 'dismissed' && <X className="w-4 h-4 text-gray-400 flex-shrink-0" />}
 
         {/* Expand Arrow */}
         {expanded ? (
-          <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+          <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+          <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
         )}
       </div>
 
       {/* Expanded Content */}
       {expanded && ext && (
-        <div className="px-4 pb-4 border-t border-slate-700/40 space-y-4">
+        <div className="px-4 pb-4 border-t border-gray-100 space-y-4">
           {/* Summary */}
           <div className="mt-3">
-            <p className="text-sm text-slate-200 leading-relaxed">{ext.summary}</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{ext.summary}</p>
             <div className="flex items-center gap-3 mt-2">
               {ext.sentiment && (
-                <span className={`text-xs ${SENTIMENT_COLORS[ext.sentiment]}`}>
+                <span className={`text-xs font-medium ${SENTIMENT_COLORS[ext.sentiment]}`}>
                   {ext.sentiment}
                 </span>
               )}
               {ext.relationshipDelta && ext.relationshipDelta !== 'maintained' && (
-                <span className={`text-xs ${
-                  ext.relationshipDelta === 'strengthened' ? 'text-green-400' :
-                  ext.relationshipDelta === 'weakened' ? 'text-red-400' :
-                  ext.relationshipDelta === 'new' ? 'text-blue-400' : 'text-gray-400'
+                <span className={`text-xs font-medium ${
+                  ext.relationshipDelta === 'strengthened' ? 'text-green-600' :
+                  ext.relationshipDelta === 'weakened' ? 'text-red-600' :
+                  ext.relationshipDelta === 'new' ? 'text-blue-600' : 'text-gray-500'
                 }`}>
                   {ext.relationshipDelta}
                 </span>
@@ -515,17 +515,17 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Commitments */}
             {(ext.myCommitments.length > 0 || ext.theirCommitments.length > 0) && (
-              <ExtractSection icon={Target} title="Commitments" color="text-amber-400">
+              <ExtractSection icon={Target} title="Commitments" color="text-amber-600">
                 {ext.myCommitments.map((c, i) => (
-                  <div key={`my-${i}`} className="text-sm text-slate-300">
-                    <span className="text-amber-400 font-medium">Mine:</span> {c.description}
-                    {c.resolvedDate && <span className="text-slate-500 ml-1">({c.resolvedDate})</span>}
+                  <div key={`my-${i}`} className="text-sm text-gray-700">
+                    <span className="text-amber-600 font-medium">Mine:</span> {c.description}
+                    {c.resolvedDate && <span className="text-gray-400 ml-1">({c.resolvedDate})</span>}
                   </div>
                 ))}
                 {ext.theirCommitments.map((c, i) => (
-                  <div key={`their-${i}`} className="text-sm text-slate-300">
-                    <span className="text-blue-400 font-medium">Theirs:</span> {c.description}
-                    {c.resolvedDate && <span className="text-slate-500 ml-1">({c.resolvedDate})</span>}
+                  <div key={`their-${i}`} className="text-sm text-gray-700">
+                    <span className="text-blue-600 font-medium">Theirs:</span> {c.description}
+                    {c.resolvedDate && <span className="text-gray-400 ml-1">({c.resolvedDate})</span>}
                   </div>
                 ))}
               </ExtractSection>
@@ -533,10 +533,10 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* Standing Offers */}
             {ext.offers.length > 0 && (
-              <ExtractSection icon={Handshake} title="Standing Offers" color="text-green-400">
+              <ExtractSection icon={Handshake} title="Standing Offers" color="text-green-600">
                 {ext.offers.map((o, i) => (
-                  <div key={i} className="text-sm text-slate-300">
-                    <span className={o.offeredBy === 'me' ? 'text-amber-400' : 'text-blue-400'}>
+                  <div key={i} className="text-sm text-gray-700">
+                    <span className={o.offeredBy === 'me' ? 'text-amber-600 font-medium' : 'text-blue-600 font-medium'}>
                       {o.offeredBy === 'me' ? 'I offered:' : 'They offered:'}
                     </span>{' '}
                     {o.description}
@@ -547,12 +547,12 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* Calendar Events */}
             {ext.calendarEvents.length > 0 && (
-              <ExtractSection icon={Calendar} title="Calendar Events" color="text-cyan-400">
+              <ExtractSection icon={Calendar} title="Calendar Events" color="text-cyan-600">
                 {ext.calendarEvents.map((e, i) => (
-                  <div key={i} className="text-sm text-slate-300">
+                  <div key={i} className="text-sm text-gray-700">
                     {e.title}
-                    {e.date && <span className="text-slate-500 ml-1">{e.date}</span>}
-                    {e.startTime && <span className="text-slate-500 ml-1">{e.startTime}</span>}
+                    {e.date && <span className="text-gray-400 ml-1">{e.date}</span>}
+                    {e.startTime && <span className="text-gray-400 ml-1">{e.startTime}</span>}
                   </div>
                 ))}
               </ExtractSection>
@@ -560,11 +560,11 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* Scheduling Leads */}
             {ext.schedulingLeads.length > 0 && (
-              <ExtractSection icon={Clock} title="Scheduling Leads" color="text-teal-400">
+              <ExtractSection icon={Clock} title="Scheduling Leads" color="text-teal-600">
                 {ext.schedulingLeads.map((s, i) => (
-                  <div key={i} className="text-sm text-slate-300">
+                  <div key={i} className="text-sm text-gray-700">
                     {s.description}
-                    {s.timeframe && <span className="text-slate-500 ml-1">({s.timeframe})</span>}
+                    {s.timeframe && <span className="text-gray-400 ml-1">({s.timeframe})</span>}
                   </div>
                 ))}
               </ExtractSection>
@@ -572,13 +572,13 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* New Contacts */}
             {ext.newContactsMentioned.length > 0 && (
-              <ExtractSection icon={Users} title="New Contacts" color="text-violet-400">
+              <ExtractSection icon={Users} title="New Contacts" color="text-violet-600">
                 {ext.newContactsMentioned.map((nc, i) => (
-                  <div key={i} className="text-sm text-slate-300">
-                    <span className="font-medium text-white">{nc.name}</span>
-                    {nc.org && <span className="text-slate-400"> at {nc.org}</span>}
-                    {nc.title && <span className="text-slate-500"> — {nc.title}</span>}
-                    <div className="text-xs text-slate-500 mt-0.5">{nc.context}</div>
+                  <div key={i} className="text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">{nc.name}</span>
+                    {nc.org && <span className="text-gray-500"> at {nc.org}</span>}
+                    {nc.title && <span className="text-gray-400"> — {nc.title}</span>}
+                    <div className="text-xs text-gray-400 mt-0.5">{nc.context}</div>
                   </div>
                 ))}
               </ExtractSection>
@@ -586,10 +586,10 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* Org Intelligence */}
             {ext.orgIntelligence.length > 0 && (
-              <ExtractSection icon={Radio} title="Org Intelligence" color="text-purple-400">
+              <ExtractSection icon={Radio} title="Org Intelligence" color="text-purple-600">
                 {ext.orgIntelligence.map((o, i) => (
-                  <div key={i} className="text-sm text-slate-300">
-                    <span className="font-medium text-white">{o.organization}:</span> {o.intelligence}
+                  <div key={i} className="text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">{o.organization}:</span> {o.intelligence}
                   </div>
                 ))}
               </ExtractSection>
@@ -597,11 +597,11 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* Life Events */}
             {ext.lifeEvents.length > 0 && (
-              <ExtractSection icon={Heart} title="Life Events" color="text-pink-400">
+              <ExtractSection icon={Heart} title="Life Events" color="text-pink-600">
                 {ext.lifeEvents.map((le, i) => (
-                  <div key={i} className="text-sm text-slate-300">
+                  <div key={i} className="text-sm text-gray-700">
                     {le.description}
-                    {le.date && <span className="text-slate-500 ml-1">({le.date})</span>}
+                    {le.date && <span className="text-gray-400 ml-1">({le.date})</span>}
                   </div>
                 ))}
               </ExtractSection>
@@ -609,10 +609,10 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* Status Changes */}
             {ext.statusChanges.length > 0 && (
-              <ExtractSection icon={Briefcase} title="Status Changes" color="text-orange-400">
+              <ExtractSection icon={Briefcase} title="Status Changes" color="text-orange-600">
                 {ext.statusChanges.map((sc, i) => (
-                  <div key={i} className="text-sm text-slate-300">
-                    <span className="font-medium text-white">{sc.person}:</span> {sc.description}
+                  <div key={i} className="text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">{sc.person}:</span> {sc.description}
                   </div>
                 ))}
               </ExtractSection>
@@ -620,13 +620,13 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
             {/* Resources */}
             {ext.referencedResources.length > 0 && (
-              <ExtractSection icon={BookOpen} title="Resources" color="text-indigo-400">
+              <ExtractSection icon={BookOpen} title="Resources" color="text-indigo-600">
                 {ext.referencedResources.map((r, i) => (
-                  <div key={i} className="text-sm text-slate-300">
+                  <div key={i} className="text-sm text-gray-700">
                     {r.description}
-                    <span className="text-slate-500 ml-1">[{r.type}]</span>
+                    <span className="text-gray-400 ml-1">[{r.type}]</span>
                     {r.action !== 'reference_only' && (
-                      <span className="text-xs text-amber-400 ml-1">→ {r.action.replace(/_/g, ' ')}</span>
+                      <span className="text-xs text-amber-600 ml-1">{r.action.replace(/_/g, ' ')}</span>
                     )}
                   </div>
                 ))}
@@ -638,7 +638,7 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
           {ext.topicsDiscussed.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {ext.topicsDiscussed.map((topic, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-slate-700/50 text-slate-400 border border-slate-600/30">
+                <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">
                   {topic}
                 </span>
               ))}
@@ -647,19 +647,19 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
 
           {/* Relationship Notes */}
           {ext.relationshipNotes && (
-            <div className="text-sm text-slate-400 italic border-l-2 border-slate-600 pl-3 mt-2">
+            <div className="text-sm text-gray-500 italic border-l-2 border-gray-200 pl-3 mt-2">
               {ext.relationshipNotes}
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-700/50">
+          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
             {isPending && (
               <>
                 <button
                   onClick={onConfirm}
                   disabled={isLoading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   Confirm
@@ -668,7 +668,7 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
                 {!showDismissForm ? (
                   <button
                     onClick={() => setShowDismissForm(true)}
-                    className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-2"
+                    className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
                   >
                     <X className="w-4 h-4" />
                     Dismiss
@@ -680,18 +680,18 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
                       value={dismissReason}
                       onChange={e => setDismissReason(e.target.value)}
                       placeholder="Reason (optional)..."
-                      className="flex-1 px-3 py-2 text-sm bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-slate-500"
+                      className="flex-1 px-3 py-2 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
                       onClick={() => { onDismiss(dismissReason || undefined); setShowDismissForm(false) }}
                       disabled={isLoading}
-                      className="px-3 py-2 text-sm text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50"
+                      className="px-3 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors disabled:opacity-50"
                     >
                       {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Dismiss'}
                     </button>
                     <button
                       onClick={() => setShowDismissForm(false)}
-                      className="px-2 py-2 text-sm text-slate-400 hover:text-white"
+                      className="px-2 py-2 text-sm text-gray-400 hover:text-gray-600"
                     >
                       Cancel
                     </button>
@@ -704,7 +704,7 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
               <button
                 onClick={onUndo}
                 disabled={isLoading}
-                className="px-4 py-2 text-sm font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
                 Undo
@@ -729,7 +729,7 @@ function ExtractSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/40">
+    <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
       <div className={`flex items-center gap-2 mb-2 ${color}`}>
         <Icon className="w-4 h-4" />
         <span className="text-xs font-medium uppercase tracking-wider">{title}</span>
