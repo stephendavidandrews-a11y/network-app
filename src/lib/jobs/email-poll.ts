@@ -145,44 +145,67 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
     const lock = await client.getMailboxLock('INBOX')
 
     try {
-      // Search for unseen messages
+      // Step 1: Light fetch — just envelopes + UIDs for unseen messages
+      const envelopes: Array<{ uid: number; envelope: Record<string, unknown> }> = []
       const messages = client.fetch({ seen: false }, {
-        source: true,
         envelope: true,
         uid: true,
       })
 
       for await (const msg of messages) {
+        envelopes.push({ uid: msg.uid, envelope: msg.envelope as Record<string, unknown> })
+      }
+
+      console.log(`[EmailPoll] Found ${envelopes.length} unseen messages`)
+
+      if (envelopes.length === 0) {
+        lock.release()
+        console.log('[EmailPoll] Done: 0 processed, 0 skipped, 0 errors')
+        await client.logout()
+        return result
+      }
+
+      // Step 2: Process each message individually
+      for (const { uid, envelope } of envelopes) {
         try {
-          const rawSource = msg.source?.toString() || ''
-          const envelope = msg.envelope
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const env = envelope as any
 
-          // Extract text content from raw source
-          // Simple approach: strip MIME headers, get text body
-          let textContent = rawSource
-
-          // Try to extract text/plain part
-          const plainMatch = rawSource.match(/Content-Type:\s*text\/plain[^\n]*\n(?:Content-Transfer-Encoding:[^\n]*\n)?\s*\n([\s\S]*?)(?:\n--|\n\.\s*$)/i)
-          if (plainMatch) {
-            textContent = plainMatch[1].trim()
-          } else {
-            // Fallback: strip common headers
-            const bodyStart = rawSource.indexOf('\n\n')
-            if (bodyStart !== -1) {
-              textContent = rawSource.substring(bodyStart + 2).trim()
+          // Download just the text content for this message
+          let textContent = ''
+          try {
+            // Try text/plain first
+            const download = await client.download(String(uid), undefined, { uid: true })
+            if (download?.content) {
+              const chunks: Buffer[] = []
+              for await (const chunk of download.content) {
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+              }
+              textContent = Buffer.concat(chunks).toString('utf-8')
             }
+          } catch {
+            console.log(`[EmailPoll] Could not download UID ${uid}, skipping`)
+            result.skipped++
+            result.items.push({
+              subject: env?.subject || '(no subject)',
+              from: env?.from?.[0]?.address || 'unknown',
+              result: 'skipped — download failed',
+            })
+            continue
           }
 
           // Strip HTML tags if present
-          textContent = textContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+          textContent = textContent.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 
           if (textContent.length < 10) {
             result.skipped++
             result.items.push({
-              subject: envelope?.subject || '(no subject)',
-              from: envelope?.from?.[0]?.address || 'unknown',
+              subject: env?.subject || '(no subject)',
+              from: env?.from?.[0]?.address || 'unknown',
               result: 'skipped — too short',
             })
+            // Mark as seen so we don't retry
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true })
             continue
           }
 
@@ -191,7 +214,7 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
 
           // Build metadata from envelope + parsed headers
           const fromAddr = parsed.from ||
-            (envelope?.from?.[0] ? `${envelope.from[0].name || ''} <${envelope.from[0].address}>`.trim() : null)
+            (env?.from?.[0] ? `${env.from[0].name || ''} <${env.from[0].address}>`.trim() : null)
 
           const contactHint = fromAddr
             ? extractName(fromAddr) || extractEmail(fromAddr)
@@ -203,8 +226,8 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
             contactHint,
             metadata: {
               originalFrom: fromAddr || undefined,
-              originalTo: parsed.to || (envelope?.to?.[0]?.address) || undefined,
-              subject: parsed.subject || envelope?.subject || undefined,
+              originalTo: parsed.to || (env?.to?.[0]?.address) || undefined,
+              subject: parsed.subject || env?.subject || undefined,
               signature: parsed.signature || undefined,
             },
           })
@@ -212,29 +235,29 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
           if (processResult.duplicate) {
             result.skipped++
             result.items.push({
-              subject: envelope?.subject || '(no subject)',
+              subject: env?.subject || '(no subject)',
               from: fromAddr || 'unknown',
               result: 'skipped — duplicate',
             })
           } else {
             result.processed++
             result.items.push({
-              subject: envelope?.subject || '(no subject)',
+              subject: env?.subject || '(no subject)',
               from: fromAddr || 'unknown',
               result: `ingested → ${processResult.itemType} (${processResult.contactName || 'unknown contact'})`,
             })
           }
 
           // Mark as seen
-          if (msg.uid) {
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true })
-          }
+          await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true })
         } catch (err) {
           result.errors++
-          console.error('[EmailPoll] Error processing message:', err)
+          console.error('[EmailPoll] Error processing message UID', uid, ':', err)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const env = envelope as any
           result.items.push({
-            subject: msg.envelope?.subject || '(unknown)',
-            from: msg.envelope?.from?.[0]?.address || 'unknown',
+            subject: env?.subject || '(unknown)',
+            from: env?.from?.[0]?.address || 'unknown',
             result: `error: ${err instanceof Error ? err.message : String(err)}`,
           })
         }
