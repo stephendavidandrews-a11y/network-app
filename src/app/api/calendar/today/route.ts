@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db'
 import { classifyCalendarLoad } from '@/lib/calendar'
 import type { CalendarDayData } from '@/types'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const today = new Date().toISOString().split('T')[0]

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { testCalendarConnection } from '@/lib/calendar'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const result = await testCalendarConnection()

@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 
+// Force all authenticated pages to render at runtime (not build time)
+// so they can access the SQLite database
+export const dynamic = 'force-dynamic'
+
 export default async function AuthenticatedLayout({
   children,
 }: {
