@@ -28,6 +28,9 @@ import {
   Plus,
   Send,
   MapPin,
+  Search,
+  UserPlus,
+  Link2,
 } from 'lucide-react'
 import { TIER_COLORS } from '@/lib/constants'
 import type { IngestionExtraction } from '@/types'
@@ -185,6 +188,24 @@ export function InboxPageContent() {
       await fetchItems()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to undo')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleAssign = async (itemId: string, contactId: string) => {
+    setActionLoading(itemId)
+    try {
+      const res = await fetch(`/api/inbox/${itemId}/assign`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      await fetchItems()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to assign contact')
     } finally {
       setActionLoading(null)
     }
@@ -393,6 +414,7 @@ export function InboxPageContent() {
               onConfirm={() => handleConfirm(item.id)}
               onDismiss={(reason) => handleDismiss(item.id, reason)}
               onUndo={() => handleUndo(item.id)}
+              onAssign={handleAssign}
               isLoading={actionLoading === item.id}
               formatTime={formatTime}
             />
@@ -403,6 +425,13 @@ export function InboxPageContent() {
   )
 }
 
+interface SimpleContact {
+  id: string
+  name: string
+  organization: string | null
+  tier: number
+}
+
 interface InboxCardProps {
   item: InboxItem
   expanded: boolean
@@ -410,18 +439,95 @@ interface InboxCardProps {
   onConfirm: () => void
   onDismiss: (reason?: string) => void
   onUndo: () => void
+  onAssign: (itemId: string, contactId: string) => Promise<void>
   isLoading: boolean
   formatTime: (d: string) => string
 }
 
-function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isLoading, formatTime }: InboxCardProps) {
+function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, onAssign, isLoading, formatTime }: InboxCardProps) {
   const [dismissReason, setDismissReason] = useState('')
   const [showDismissForm, setShowDismissForm] = useState(false)
   const [editedCalEvents, setEditedCalEvents] = useState<Record<number, Partial<{ title: string; date: string; startTime: string; endTime: string; location: string }>>>({})
   const [addedCalEvents, setAddedCalEvents] = useState<Set<number>>(new Set())
   const [calEventLoading, setCalEventLoading] = useState<number | null>(null)
   const [calEventError, setCalEventError] = useState<string | null>(null)
+  // Contact assignment state
+  const [showContactPicker, setShowContactPicker] = useState(false)
+  const [contactSearch, setContactSearch] = useState('')
+  const [allContacts, setAllContacts] = useState<SimpleContact[]>([])
+  const [contactsLoaded, setContactsLoaded] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [newContactName, setNewContactName] = useState(item.contactHint || '')
+  const [newContactOrg, setNewContactOrg] = useState('')
+  const [newContactEmail, setNewContactEmail] = useState('')
+  const [assignLoading, setAssignLoading] = useState(false)
   const ext = item.extraction
+
+  // Load contacts when picker opens
+  const loadContacts = async () => {
+    if (contactsLoaded) return
+    try {
+      const res = await fetch('/api/contacts')
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        setAllContacts(data.map((c: Record<string, unknown>) => ({
+          id: c.id as string,
+          name: c.name as string,
+          organization: c.organization as string | null,
+          tier: c.tier as number,
+        })))
+      }
+      setContactsLoaded(true)
+    } catch {
+      // Silent fail — user can retry
+    }
+  }
+
+  const handleAssignExisting = async (contactId: string) => {
+    setAssignLoading(true)
+    try {
+      await onAssign(item.id, contactId)
+      setShowContactPicker(false)
+    } finally {
+      setAssignLoading(false)
+    }
+  }
+
+  const handleCreateAndAssign = async () => {
+    if (!newContactName.trim()) return
+    setAssignLoading(true)
+    try {
+      // Create contact
+      const createRes = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newContactName.trim(),
+          organization: newContactOrg.trim() || null,
+          email: newContactEmail.trim() || null,
+          tier: 2,
+        }),
+      })
+      const contact = await createRes.json()
+      if (contact.error) throw new Error(contact.error)
+
+      // Assign to item
+      await onAssign(item.id, contact.id)
+      setShowContactPicker(false)
+      setShowCreateForm(false)
+    } catch {
+      // Error handled by parent
+    } finally {
+      setAssignLoading(false)
+    }
+  }
+
+  const filteredContacts = contactSearch.trim()
+    ? allContacts.filter(c =>
+        c.name.toLowerCase().includes(contactSearch.toLowerCase()) ||
+        (c.organization && c.organization.toLowerCase().includes(contactSearch.toLowerCase()))
+      )
+    : allContacts.slice(0, 10)
 
   const updateCalEvent = (idx: number, field: string, value: string) => {
     setEditedCalEvents(prev => ({
@@ -521,8 +627,21 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
               )}
             </span>
           ) : (
-            <span className="text-sm text-gray-400 italic">
+            <span className="text-sm text-gray-400 italic flex items-center gap-1.5">
               {item.contactHint || 'Unknown contact'}
+              {isPending && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowContactPicker(true)
+                    loadContacts()
+                  }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                >
+                  <Link2 className="w-3 h-3" />
+                  Link
+                </button>
+              )}
             </span>
           )}
         </div>
@@ -550,6 +669,122 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, isL
           <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
         )}
       </div>
+
+      {/* Contact Assignment Panel */}
+      {showContactPicker && (
+        <div className="px-4 py-3 border-t border-blue-100 bg-blue-50/50" onClick={e => e.stopPropagation()}>
+          {!showCreateForm ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={contactSearch}
+                  onChange={e => setContactSearch(e.target.value)}
+                  placeholder="Search contacts..."
+                  className="flex-1 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+                <button
+                  onClick={() => { setShowCreateForm(true); setNewContactName(item.contactHint || '') }}
+                  className="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors flex items-center gap-1"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  New
+                </button>
+                <button
+                  onClick={() => setShowContactPicker(false)}
+                  className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {filteredContacts.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white divide-y divide-gray-100">
+                  {filteredContacts.map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleAssignExisting(c.id)}
+                      disabled={assignLoading}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between disabled:opacity-50"
+                    >
+                      <span>
+                        <span className="font-medium text-gray-900">{c.name}</span>
+                        {c.organization && <span className="text-gray-400 ml-1">({c.organization})</span>}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-xs border ${TIER_COLORS[c.tier]}`}>
+                        T{c.tier}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : contactsLoaded ? (
+                <p className="text-xs text-gray-400 text-center py-2">
+                  No contacts found.{' '}
+                  <button onClick={() => { setShowCreateForm(true); setNewContactName(contactSearch || item.contactHint || '') }} className="text-blue-500 hover:underline">
+                    Create new
+                  </button>
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 text-center py-2">Loading contacts...</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <UserPlus className="w-4 h-4 text-green-600" />
+                Create New Contact
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  value={newContactName}
+                  onChange={e => setNewContactName(e.target.value)}
+                  placeholder="Name *"
+                  className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+                <input
+                  type="text"
+                  value={newContactOrg}
+                  onChange={e => setNewContactOrg(e.target.value)}
+                  placeholder="Organization"
+                  className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="email"
+                  value={newContactEmail}
+                  onChange={e => setNewContactEmail(e.target.value)}
+                  placeholder="Email"
+                  className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCreateAndAssign}
+                  disabled={assignLoading || !newContactName.trim()}
+                  className="px-4 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  {assignLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
+                  Create & Link
+                </button>
+                <button
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Back to search
+                </button>
+                <button
+                  onClick={() => { setShowContactPicker(false); setShowCreateForm(false) }}
+                  className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600 ml-auto"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Expanded Content */}
       {expanded && ext && (
