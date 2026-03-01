@@ -126,13 +126,16 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
 
   const result: EmailPollResult = { processed: 0, skipped: 0, errors: 0, items: [] }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = new ImapFlow({
     host,
     port: 993,
     secure: true,
     auth: { user, pass },
     logger: false,
-  })
+    socketTimeout: 30000,
+    greetingTimeout: 15000,
+  } as any)
 
   try {
     await client.connect()
@@ -240,11 +243,17 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
       lock.release()
     }
 
-    await client.logout()
     console.log(`[EmailPoll] Done: ${result.processed} processed, ${result.skipped} skipped, ${result.errors} errors`)
   } catch (err) {
     console.error('[EmailPoll] Connection error:', err)
     throw err
+  } finally {
+    try {
+      await client.logout()
+    } catch {
+      // Already disconnected, ignore
+      try { client.close(); } catch { /* noop */ }
+    }
   }
 
   return result
