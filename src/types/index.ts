@@ -165,3 +165,32 @@ export interface DashboardData {
   overdueContacts: ContactRecord[]
   upcomingEvents: EventRecord[]
 }
+
+// ── Calendar Types ──
+
+export interface CalendarMeeting {
+  id: string
+  summary: string
+  start: string
+  end: string
+  location: string | null
+  attendees: Array<{
+    email: string
+    displayName: string | null
+    responseStatus: string
+  }>
+  matchedContactId: string | null
+  matchedContactName: string | null
+  matchedContactTier: number | null
+  linkedEventId: string | null
+  linkedEventName: string | null
+}
+
+export interface CalendarDayData {
+  date: string
+  meetings: CalendarMeeting[]
+  meetingCount: number
+  fetchedAt: string
+}
+
+export type CalendarLoad = 'light' | 'normal' | 'heavy'

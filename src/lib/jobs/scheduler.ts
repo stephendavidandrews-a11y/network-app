@@ -4,6 +4,7 @@ import { runScoreUpdate } from './score-update'
 import { runCadenceCheck } from './cadence-check'
 import { generateDailyBriefing } from './daily-briefing'
 import { runDbBackup } from './db-backup'
+import { runCalendarSync } from './calendar-sync'
 
 let scheduled = false
 
@@ -14,6 +15,17 @@ export function startScheduler() {
   const prisma = new PrismaClient()
 
   console.log('[Scheduler] Starting background jobs...')
+
+  // Calendar sync: daily at 5:00 AM (before other jobs)
+  cron.schedule('0 5 * * *', async () => {
+    console.log('[Job] Running calendar sync...')
+    try {
+      const result = await runCalendarSync(prisma)
+      console.log(`[Job] Calendar sync complete: ${result.meetingCount} meetings for ${result.date}`)
+    } catch (error) {
+      console.error('[Job] Calendar sync failed:', error)
+    }
+  })
 
   // Score update: daily at 5:15 AM
   cron.schedule('15 5 * * *', async () => {
@@ -59,5 +71,5 @@ export function startScheduler() {
     }
   })
 
-  console.log('[Scheduler] Jobs scheduled: db_backup(2AM), score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6AM)')
+  console.log('[Scheduler] Jobs scheduled: db_backup(2AM), calendar_sync(5AM), score_update(5:15AM), cadence_check(5:30AM), daily_briefing(6AM)')
 }

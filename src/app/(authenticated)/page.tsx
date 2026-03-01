@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db'
 import { DashboardContent } from '@/components/dashboard/DashboardContent'
+import { classifyCalendarLoad } from '@/lib/calendar'
+import type { CalendarMeeting, CalendarLoad } from '@/types'
 
 async function getDashboardData() {
   const today = new Date().toISOString().split('T')[0]
@@ -111,6 +113,23 @@ async function getDashboardData() {
     weeklyTrends.push({ week: weekLabel, interactions: weekInteractions, outreach: weekOutreach })
   }
 
+  // Calendar data (from cache)
+  const calendarCache = await prisma.calendarCache.findUnique({
+    where: { date: today },
+  })
+
+  let todaysMeetings: CalendarMeeting[] = []
+  let calendarLoad: CalendarLoad = 'light'
+  let calendarMeetingCount = 0
+  if (calendarCache) {
+    try {
+      const calData = JSON.parse(calendarCache.calendarData)
+      todaysMeetings = calData.meetings || []
+      calendarMeetingCount = calendarCache.meetingCount
+      calendarLoad = classifyCalendarLoad(calendarMeetingCount)
+    } catch { /* skip invalid cache */ }
+  }
+
   const totalContacts = allContacts.length
   const overdueTier1 = overdueContacts.filter(c => c.tier === 1).length
   const overdueTier2 = overdueContacts.filter(c => c.tier === 2).length
@@ -128,6 +147,9 @@ async function getDashboardData() {
     contacted30d: contacted30d.length,
     outreachSentThisWeek,
     weeklyTrends,
+    todaysMeetings,
+    calendarLoad,
+    calendarMeetingCount,
     recentSignals: recentSignals.map(s => ({
       ...s,
       contactName: s.contact.name,

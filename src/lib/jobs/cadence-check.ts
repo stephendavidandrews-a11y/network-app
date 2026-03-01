@@ -1,8 +1,23 @@
 import { PrismaClient } from '@prisma/client'
 import { calculateOutreachPriority } from '../scoring'
 import { daysSince } from '../utils'
+import { classifyCalendarLoad, getOutreachCap } from '../calendar'
 
-export async function runCadenceCheck(prisma: PrismaClient): Promise<{ generated: number; contacts: string[] }> {
+export async function runCadenceCheck(prisma: PrismaClient): Promise<{
+  generated: number
+  contacts: string[]
+  calendarLoad: string
+  outreachCap: number
+}> {
+  // Read today's calendar load to cap outreach volume
+  const today = new Date().toISOString().split('T')[0]
+  const calendarCache = await prisma.calendarCache.findUnique({ where: { date: today } })
+  const meetingCount = calendarCache?.meetingCount || 0
+  const calendarLoad = classifyCalendarLoad(meetingCount)
+  const outreachCap = getOutreachCap(calendarLoad)
+
+  console.log(`[Cadence Check] Calendar load: ${calendarLoad} (${meetingCount} meetings), outreach cap: ${outreachCap}`)
+
   // Find contacts that are overdue based on their tier cadence
   const contacts = await prisma.contact.findMany({
     where: {
@@ -17,7 +32,14 @@ export async function runCadenceCheck(prisma: PrismaClient): Promise<{ generated
     },
   })
 
-  const generated: string[] = []
+  // Collect all candidates with priority scores
+  const candidates: Array<{
+    contactId: string
+    contactName: string
+    priority: number
+    overdueBy: number
+    triggerDescription: string
+  }> = []
 
   for (const contact of contacts) {
     const days = daysSince(contact.lastInteractionDate)
@@ -40,18 +62,34 @@ export async function runCadenceCheck(prisma: PrismaClient): Promise<{ generated
 
     const overdueBy = days - contact.targetCadenceDays
 
+    candidates.push({
+      contactId: contact.id,
+      contactName: contact.name,
+      priority,
+      overdueBy,
+      triggerDescription: `${overdueBy} days overdue (cadence: ${contact.targetCadenceDays}d, last: ${contact.lastInteractionDate || 'never'})`,
+    })
+  }
+
+  // Sort by priority descending, limit to calendar-aware cap
+  candidates.sort((a, b) => b.priority - a.priority)
+  const toCreate = candidates.slice(0, outreachCap)
+
+  const generated: string[] = []
+
+  for (const candidate of toCreate) {
     await prisma.outreachQueue.create({
       data: {
-        contactId: contact.id,
+        contactId: candidate.contactId,
         triggerType: 'cadence_overdue',
-        triggerDescription: `${overdueBy} days overdue (cadence: ${contact.targetCadenceDays}d, last: ${contact.lastInteractionDate || 'never'})`,
-        priority: Math.max(1, Math.min(Math.round(priority / 10), 10)),
+        triggerDescription: candidate.triggerDescription,
+        priority: Math.max(1, Math.min(Math.round(candidate.priority / 10), 10)),
         status: 'queued',
       },
     })
 
-    generated.push(contact.name)
+    generated.push(candidate.contactName)
   }
 
-  return { generated: generated.length, contacts: generated }
+  return { generated: generated.length, contacts: generated, calendarLoad, outreachCap }
 }

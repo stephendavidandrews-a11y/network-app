@@ -4,6 +4,7 @@ import { runCadenceCheck } from '@/lib/jobs/cadence-check'
 import { runScoreUpdate } from '@/lib/jobs/score-update'
 import { generateDailyBriefing } from '@/lib/jobs/daily-briefing'
 import { runDbBackup } from '@/lib/jobs/db-backup'
+import { runCalendarSync } from '@/lib/jobs/calendar-sync'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
@@ -23,13 +24,19 @@ export async function POST(request: NextRequest) {
         const result = await generateDailyBriefing(prisma)
         return NextResponse.json({ job, result: { date: result.date, overdueCount: result.overdueContacts.length } })
       }
+      case 'calendar_sync': {
+        const result = await runCalendarSync(prisma)
+        return NextResponse.json({ job, result })
+      }
       case 'all': {
+        const calendar = await runCalendarSync(prisma)
         const scores = await runScoreUpdate(prisma)
         const cadence = await runCadenceCheck(prisma)
         const briefing = await generateDailyBriefing(prisma)
         return NextResponse.json({
           job: 'all',
           results: {
+            calendar: { meetingCount: calendar.meetingCount },
             scores: { updated: scores.updated },
             cadence: { generated: cadence.generated },
             briefing: { date: briefing.date },

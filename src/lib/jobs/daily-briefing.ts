@@ -105,7 +105,18 @@ export async function generateDailyBriefing(prisma: PrismaClient): Promise<Brief
     date: today,
     overdueContacts,
     openCommitments: openCommitments.slice(0, 10),
-    todaysMeetings: [], // Phase 3: populated by Google Calendar integration
+    todaysMeetings: await (async () => {
+      const calendarCache = await prisma.calendarCache.findUnique({ where: { date: today } })
+      if (!calendarCache) return []
+      try {
+        const calData = JSON.parse(calendarCache.calendarData)
+        return (calData.meetings || []).map((m: { start: string; summary: string; matchedContactName?: string }) => {
+          const time = new Date(m.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+          const contact = m.matchedContactName ? ` (${m.matchedContactName})` : ''
+          return `${time}: ${m.summary}${contact}`
+        })
+      } catch { return [] }
+    })(),
     outreachQueue: queue.map(q => ({
       contactName: q.contact?.name || 'Unknown',
       trigger: q.triggerDescription,

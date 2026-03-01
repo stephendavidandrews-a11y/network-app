@@ -11,6 +11,7 @@ const TABS = [
   { id: 'venues', label: 'Venues' },
   { id: 'categories', label: 'Categories' },
   { id: 'email', label: 'Email' },
+  { id: 'calendar', label: 'Google Calendar' },
 ]
 
 export default function SettingsPage() {
@@ -144,6 +145,10 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+
+          {activeTab === 'calendar' && (
+            <CalendarSettings />
+          )}
         </div>
       </div>
     </div>
@@ -172,6 +177,82 @@ function SettingEditor({
         className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
         <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save'}
       </button>
+    </div>
+  )
+}
+
+function CalendarSettings() {
+  const [status, setStatus] = useState<{ connected: boolean; email: string | null; error: string | null } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+
+  const checkConnection = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/calendar/status')
+      const data = await res.json()
+      setStatus(data)
+    } catch {
+      setStatus({ connected: false, email: null, error: 'Failed to check connection' })
+    }
+    setLoading(false)
+  }
+
+  const triggerSync = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/jobs/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job: 'calendar_sync' }),
+      })
+      const data = await res.json()
+      setSyncResult(`Synced ${data.result?.meetingCount || 0} meetings for ${data.result?.date || 'today'}`)
+    } catch {
+      setSyncResult('Sync failed')
+    }
+    setSyncing(false)
+  }
+
+  useEffect(() => { checkConnection() }, [])
+
+  return (
+    <div className="rounded-lg border bg-white p-6 space-y-4">
+      <h2 className="text-lg font-semibold text-gray-900">Google Calendar</h2>
+      <p className="text-sm text-gray-500">
+        Calendar integration syncs your meetings daily at 5:00 AM UTC to enable meeting prep briefs and calendar-aware outreach volume.
+      </p>
+
+      {status && (
+        <div className={cn('rounded-md p-3 text-sm', status.connected ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>
+          {status.connected
+            ? `Connected to ${status.email}`
+            : `Not connected: ${status.error || 'Credentials not configured'}`}
+        </div>
+      )}
+
+      <div className="space-y-2 text-sm text-gray-600">
+        <p><strong>Client ID:</strong> Set via GOOGLE_CLIENT_ID env var</p>
+        <p><strong>Client Secret:</strong> Set via GOOGLE_CLIENT_SECRET env var</p>
+        <p><strong>Refresh Token:</strong> Set via GOOGLE_REFRESH_TOKEN env var</p>
+      </div>
+
+      {syncResult && (
+        <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">{syncResult}</div>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={checkConnection} disabled={loading}
+          className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+          {loading ? 'Checking...' : 'Test Connection'}
+        </button>
+        <button onClick={triggerSync} disabled={syncing || !status?.connected}
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+          {syncing ? 'Syncing...' : 'Sync Now'}
+        </button>
+      </div>
     </div>
   )
 }

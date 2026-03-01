@@ -31,6 +31,20 @@ interface DashboardProps {
     contacted30d: number
     outreachSentThisWeek: number
     weeklyTrends: Array<{ week: string; interactions: number; outreach: number }>
+    todaysMeetings: Array<{
+      id: string
+      summary: string
+      start: string
+      end: string
+      location: string | null
+      matchedContactId: string | null
+      matchedContactName: string | null
+      matchedContactTier: number | null
+      linkedEventId: string | null
+      linkedEventName: string | null
+    }>
+    calendarLoad: 'light' | 'normal' | 'heavy'
+    calendarMeetingCount: number
     recentSignals: Array<{
       id: string
       signalType: string
@@ -101,9 +115,15 @@ export function DashboardContent({ data }: DashboardProps) {
           <p className="text-sm text-gray-500 mt-0.5">{dateStr}</p>
         </div>
         <div className="flex gap-4 text-sm">
-          <span className="text-red-600 font-medium">{data.overdueCount} overdue contacts</span>
-          <span className="text-amber-600 font-medium">{data.openCommitmentsCount} open commitments</span>
-          <span className="text-blue-600 font-medium">{data.outreachReadyCount} outreach drafts ready</span>
+          <span className={cn(
+            'font-medium',
+            data.calendarLoad === 'heavy' ? 'text-red-600' : data.calendarLoad === 'normal' ? 'text-amber-600' : 'text-green-600'
+          )}>
+            {data.calendarMeetingCount} meetings today
+          </span>
+          <span className="text-red-600 font-medium">{data.overdueCount} overdue</span>
+          <span className="text-amber-600 font-medium">{data.openCommitmentsCount} commitments</span>
+          <span className="text-blue-600 font-medium">{data.outreachReadyCount} outreach ready</span>
         </div>
       </div>
 
@@ -154,6 +174,67 @@ export function DashboardContent({ data }: DashboardProps) {
                     <button className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
                       Approve & Send
                     </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Today's Meetings */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-indigo-600" />
+            Today&apos;s Meetings
+            <span className={cn(
+              'ml-1 rounded-full px-2 py-0.5 text-xs font-medium',
+              data.calendarLoad === 'heavy' ? 'bg-red-100 text-red-700' :
+              data.calendarLoad === 'normal' ? 'bg-amber-100 text-amber-700' :
+              'bg-green-100 text-green-700'
+            )}>
+              {data.calendarMeetingCount} ({data.calendarLoad})
+            </span>
+          </h2>
+        </div>
+        {data.todaysMeetings.length === 0 ? (
+          <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">
+            No meetings today — clear for outreach
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {data.todaysMeetings.map((meeting) => (
+              <div key={meeting.id} className="rounded-lg border bg-white p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-400">
+                        {formatMeetingTime(meeting.start)} – {formatMeetingTime(meeting.end)}
+                      </span>
+                      <span className="font-medium text-gray-900">{meeting.summary}</span>
+                    </div>
+                    {meeting.matchedContactName && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={cn('inline-flex h-5 items-center rounded border px-1.5 text-xs font-medium', TIER_COLORS[meeting.matchedContactTier || 3])}>
+                          T{meeting.matchedContactTier}
+                        </span>
+                        <Link href={`/contacts/${meeting.matchedContactId}`} className="text-sm text-blue-600 hover:text-blue-700">
+                          {meeting.matchedContactName}
+                        </Link>
+                      </div>
+                    )}
+                    {meeting.linkedEventName && (
+                      <p className="mt-1 text-xs text-indigo-600">
+                        Also at tracked event:{' '}
+                        <Link href={`/events/${meeting.linkedEventId}`} className="underline hover:text-indigo-700">
+                          {meeting.linkedEventName}
+                        </Link>
+                      </p>
+                    )}
+                    {meeting.location && (
+                      <p className="mt-0.5 text-xs text-gray-400">{meeting.location}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -385,6 +466,14 @@ export function DashboardContent({ data }: DashboardProps) {
       </div>
     </div>
   )
+}
+
+function formatMeetingTime(isoString: string): string {
+  return new Date(isoString).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
 }
 
 function MetricCard({

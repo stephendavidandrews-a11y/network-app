@@ -196,3 +196,13 @@ model AppSetting {
 
   @@map("app_settings")
 }
+
+model CalendarCache {
+  id           String @id @default(uuid())
+  date         String @unique
+  calendarData String @map("calendar_data")
+  meetingCount Int    @default(0) @map("meeting_count")
+  fetchedAt    String @default(dbgenerated("(datetime('now'))")) @map("fetched_at")
+
+  @@map("calendar_cache")
+}
