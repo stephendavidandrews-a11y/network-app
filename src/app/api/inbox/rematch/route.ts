@@ -97,7 +97,7 @@ function extractForwardedHeaders(text: string): {
  */
 function extractEmail(addr: string): string {
   const match = addr.match(/<([^>]+)>/)
-  return match ? match[1] : addr.trim()
+  return match ? match[1].trim() : addr.trim()
 }
 
 /**
@@ -133,7 +133,17 @@ export async function POST() {
     let unchanged = 0
 
     for (const item of items) {
-      const rawContent = item.rawContent || ''
+      // Clean up raw content: decode HTML entities + strip quoted-printable artifacts
+      let rawContent = (item.rawContent || '')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/=\r?\n/g, '')        // quoted-printable soft line breaks
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => {
+          try { return String.fromCharCode(parseInt(hex, 16)) } catch { return '' }
+        })
 
       // Re-parse forwarded headers from raw content
       const headers = extractForwardedHeaders(rawContent)
