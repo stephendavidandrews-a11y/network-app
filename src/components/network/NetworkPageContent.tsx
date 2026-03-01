@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { TIER_COLORS, CATEGORIES } from '@/lib/constants'
-import { Network, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
+import { NetworkGraph } from './NetworkGraph'
 
 interface Props {
   contacts: Array<{
@@ -67,12 +68,8 @@ export function NetworkPageContent({ contacts, relationships, categoryCounts }: 
         </div>
       </div>
 
-      {/* Network Graph Placeholder */}
-      <div className="rounded-lg border bg-white p-8 text-center">
-        <Network className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-        <p className="text-gray-500">Interactive network graph</p>
-        <p className="text-xs text-gray-400 mt-1">Force-directed visualization will be added in Phase 5 (react-force-graph)</p>
-      </div>
+      {/* Network Graph */}
+      <NetworkGraph />
 
       {/* Gap Analysis */}
       <div className="rounded-lg border bg-white p-6">
