@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
+  AlertTriangle,
   ArrowLeft,
   Calendar,
   ChevronDown,
@@ -21,6 +22,10 @@ import {
   RefreshCw,
   Send,
   Twitter,
+  Trash2,
+  GitMerge,
+  Search,
+  X,
   Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -130,6 +135,51 @@ interface Props {
 export function ContactDetailContent({ contact, relationships, relatedContacts, commitments, latestPrep, dossier, standingOffers }: Props) {
   const router = useRouter()
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showMergeModal, setShowMergeModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [merging, setMerging] = useState(false)
+  const [mergeSearch, setMergeSearch] = useState('')
+  const [mergeTargets, setMergeTargets] = useState<Array<{id: string; name: string; organization: string | null}>>([])
+  const [mergeTargetId, setMergeTargetId] = useState<string | null>(null)
+  const [mergeTargetName, setMergeTargetName] = useState('')
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/contacts/' + contact.id, { method: 'DELETE' })
+      if (res.ok) { router.push('/contacts') }
+      else { alert('Failed to delete contact') }
+    } catch { alert('Failed to delete contact') }
+    finally { setDeleting(false) }
+  }
+
+  const handleMerge = async () => {
+    if (!mergeTargetId) return
+    setMerging(true)
+    try {
+      const res = await fetch('/api/contacts/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId: contact.id, targetId: mergeTargetId }),
+      })
+      const data = await res.json()
+      if (res.ok) { router.push('/contacts/' + mergeTargetId) }
+      else { alert(data.error || 'Merge failed') }
+    } catch { alert('Merge failed') }
+    finally { setMerging(false) }
+  }
+
+  const searchMergeTargets = async (q: string) => {
+    setMergeSearch(q)
+    if (q.length < 2) { setMergeTargets([]); return }
+    try {
+      const res = await fetch('/api/contacts?search=' + encodeURIComponent(q) + '&limit=10&fields=id,name,organization')
+      const data = await res.json()
+      setMergeTargets((data.contacts || []).filter((c: any) => c.id !== contact.id))
+    } catch { setMergeTargets([]) }
+  }
+
   const openCommitments = commitments.filter(c => !c.fulfilled)
   const fulfilledCommitments = commitments.filter(c => c.fulfilled)
 
@@ -154,6 +204,14 @@ export function ContactDetailContent({ contact, relationships, relatedContacts, 
             <Edit className="h-4 w-4" />
             Edit
           </Link>
+          <button onClick={() => setShowMergeModal(true)} className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <GitMerge className="h-4 w-4" />
+            Merge
+          </button>
+          <button onClick={() => setShowDeleteModal(true)} className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </button>
         </div>
       </div>
 
@@ -484,6 +542,82 @@ export function ContactDetailContent({ contact, relationships, relatedContacts, 
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Delete Contact</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              Are you sure you want to delete <strong>{contact.name}</strong>?
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              This will permanently remove this contact and all their interactions, commitments, signals, and other related data.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50" disabled={deleting}>Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
+                {deleting ? 'Deleting...' : 'Delete Contact'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge Modal */}
+      {showMergeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                  <GitMerge className="h-5 w-5 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Merge Contact</h3>
+              </div>
+              <button onClick={() => { setShowMergeModal(false); setMergeTargetId(null); setMergeSearch(''); setMergeTargets([]) }} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Merge <strong>{contact.name}</strong> into another contact. All data will be transferred.
+            </p>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input type="text" value={mergeSearch} onChange={(e) => searchMergeTargets(e.target.value)} placeholder="Search for target contact..." className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
+              {mergeTargets.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {mergeTargets.map(t => (
+                    <button key={t.id} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50" onClick={() => { setMergeTargetId(t.id); setMergeTargetName(t.name); setMergeTargets([]); setMergeSearch(t.name) }}>
+                      <span className="font-medium">{t.name}</span>
+                      {t.organization && <span className="text-gray-500 ml-2">{t.organization}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {mergeTargetId && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm text-amber-800">
+                  <strong>{contact.name}</strong> will be merged into <strong>{mergeTargetName}</strong>. All data will be transferred.
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setShowMergeModal(false); setMergeTargetId(null); setMergeSearch(''); setMergeTargets([]) }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50" disabled={merging}>Cancel</button>
+              <button onClick={handleMerge} disabled={!mergeTargetId || merging} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {merging ? 'Merging...' : 'Merge Contacts'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
