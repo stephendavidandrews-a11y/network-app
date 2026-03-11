@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+
+export async function GET(request: NextRequest) {
+  try {
+    const contactId = request.nextUrl.searchParams.get('contactId')
+    if (!contactId) {
+      return NextResponse.json({ error: 'contactId required' }, { status: 400 })
+    }
+
+    const interests = await prisma.personalInterest.findMany({
+      where: { contactId },
+      orderBy: { createdAt: 'desc' },
+    })
+    return NextResponse.json(interests)
+  } catch (error) {
+    console.error('[Interests] GET error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    if (!body.contactId || !body.interest) {
+      return NextResponse.json({ error: 'contactId and interest required' }, { status: 400 })
+    }
+
+    const interest = await prisma.personalInterest.create({
+      data: {
+        contactId: body.contactId,
+        interest: body.interest.trim(),
+        confidence: body.confidence || 'medium',
+        source: body.source || 'manual',
+      },
+    })
+    return NextResponse.json(interest, { status: 201 })
+  } catch (error) {
+    console.error('[Interests] POST error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const id = request.nextUrl.searchParams.get('id')
+    if (!id) {
+      return NextResponse.json({ error: 'id required' }, { status: 400 })
+    }
+
+    await prisma.personalInterest.delete({ where: { id } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[Interests] DELETE error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}

@@ -35,6 +35,7 @@ interface Props {
     overdue: boolean
     search?: string
     sort: string
+    type?: string
   }
 }
 
@@ -113,11 +114,19 @@ export function ContactsPageContent({ contacts, categoryCounts, filters }: Props
     URL.revokeObjectURL(url)
   }, [selected])
 
+
+  const typeOptions = [
+    { value: '', label: 'All' },
+    { value: 'professional', label: 'Professional' },
+    { value: 'personal', label: 'Personal' },
+    { value: 'both', label: 'Both' },
+  ]
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-gray-500">{contacts.length} contacts</span>
           <button
             onClick={exportSelected}
@@ -125,7 +134,7 @@ export function ContactsPageContent({ contacts, categoryCounts, filters }: Props
             title={selected.size > 0 ? `Export ${selected.size} selected` : 'Export all'}
           >
             <Download className="h-4 w-4" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </button>
           <div className="flex rounded-md border">
             <button
@@ -146,9 +155,28 @@ export function ContactsPageContent({ contacts, categoryCounts, filters }: Props
             className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
           >
             <Plus className="h-4 w-4" />
-            Add Contact
+            <span className="hidden sm:inline">Add Contact</span>
           </Link>
         </div>
+      </div>
+
+      {/* Contact Type Filter */}
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-gray-500 mr-1">Type:</span>
+        {typeOptions.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => updateFilter('type', opt.value || null)}
+            className={cn(
+              'rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
+              (filters.type || '') === opt.value
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* Bulk action bar */}
@@ -196,7 +224,7 @@ export function ContactsPageContent({ contacts, categoryCounts, filters }: Props
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-64 rounded-md border bg-white pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="h-9 w-full sm:w-64 rounded-md border bg-white pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </form>
 
@@ -317,12 +345,12 @@ export function ContactsPageContent({ contacts, categoryCounts, filters }: Props
                   />
                 </th>
                 <th className="px-4 py-2 text-left font-medium text-gray-500">Name</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Organization</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-500 hidden sm:table-cell">Organization</th>
                 <th className="px-4 py-2 text-center font-medium text-gray-500">Tier</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Status</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Last Contact</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-500">Strength</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-500">Value</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-500 hidden sm:table-cell">Status</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-500 hidden md:table-cell">Last Contact</th>
+                <th className="px-4 py-2 text-center font-medium text-gray-500 hidden md:table-cell">Strength</th>
+                <th className="px-4 py-2 text-center font-medium text-gray-500 hidden lg:table-cell">Value</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -342,25 +370,25 @@ export function ContactsPageContent({ contacts, categoryCounts, filters }: Props
                     </Link>
                     {contact.title && <p className="text-xs text-gray-400">{contact.title}</p>}
                   </td>
-                  <td className="px-4 py-2 text-gray-600">{contact.organization || '\u2014'}</td>
+                  <td className="px-4 py-2 text-gray-600 hidden sm:table-cell">{contact.organization || '\u2014'}</td>
                   <td className="px-4 py-2 text-center">
                     <span className={cn('inline-flex h-5 items-center rounded border px-1.5 text-xs font-medium', TIER_COLORS[contact.tier])}>
                       T{contact.tier}
                     </span>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 hidden sm:table-cell">
                     <div className="flex items-center gap-1.5">
                       <span className={cn('h-2 w-2 rounded-full', STATUS_COLORS[contact.status] || 'bg-gray-300')} />
                       <span className="text-gray-600 text-xs">{STATUS_LABELS[contact.status]}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 hidden md:table-cell">
                     <span className={cn('text-xs', contact.isOverdue ? 'text-red-500 font-medium' : 'text-gray-500')}>
                       {formatRelativeDate(contact.lastInteractionDate)}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-center text-xs text-gray-500">{contact.relationshipStrength.toFixed(1)}</td>
-                  <td className="px-4 py-2 text-center text-xs text-gray-500">{contact.strategicValue.toFixed(1)}</td>
+                  <td className="px-4 py-2 text-center text-xs text-gray-500 hidden md:table-cell">{contact.relationshipStrength.toFixed(1)}</td>
+                  <td className="px-4 py-2 text-center text-xs text-gray-500 hidden lg:table-cell">{contact.strategicValue.toFixed(1)}</td>
                 </tr>
               ))}
             </tbody>

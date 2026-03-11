@@ -5,7 +5,7 @@
 
 set -e
 
-APP_DIR="/opt/network-app"
+APP_DIR="/Users/stephen/Documents/Website/network"
 LOG_DIR="/var/log/network-app"
 
 echo "=== Setting up network-app server ==="
@@ -65,7 +65,7 @@ NODE_ENV=production
 ENVEOF
 
 echo ""
-echo "IMPORTANT: Edit /opt/network-app/.env.local with your actual credentials!"
+echo "IMPORTANT: Edit $APP_DIR/.env.local with your actual credentials!"
 echo ""
 
 # Build the app
@@ -93,6 +93,6 @@ echo "  cd $APP_DIR && npm run db:seed"
 echo ""
 echo "=== Setup complete ==="
 echo "1. Point DNS A record for network.stephenandrews.org to this server's IP"
-echo "2. Edit /opt/network-app/.env.local with your credentials"
-echo "3. Run: cd /opt/network-app && npm run build && pm2 restart network-app"
+echo "2. Edit $APP_DIR/.env.local with your credentials"
+echo "3. Run: cd $APP_DIR && npm run build && pm2 restart network-app"
 echo "4. Run certbot if DNS wasn't ready: certbot --nginx -d network.stephenandrews.org"

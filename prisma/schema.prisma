@@ -36,6 +36,15 @@ model Contact {
   status String  @default("target")
   notes  String?
 
+  // Dashboard/social fields (exist in DB, needed by page.tsx)
+  contactType         String  @default("professional") @map("contact_type")
+  outreachMode        String  @default("direct") @map("outreach_mode")
+  accessibility       String  @default("high")
+  outreachTiming      String? @map("outreach_timing")
+  personalRing        String? @map("personal_ring")
+  personalCadenceDays Int?    @map("personal_cadence_days")
+  funnelStage         String? @map("funnel_stage")
+
   createdAt String @default(dbgenerated("(datetime('now'))")) @map("created_at")
   updatedAt String @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
@@ -44,20 +53,42 @@ model Contact {
   discoveredVia         String? @map("discovered_via") // which contact/interaction surfaced this person
   dossierCurrentVersion Int?    @map("dossier_current_version")
 
-  interactions      Interaction[]
-  signals           IntelligenceSignal[]
-  outreachItems     OutreachQueue[]
-  relationshipsAsA  ContactRelationship[] @relation("ContactA")
-  relationshipsAsB  ContactRelationship[] @relation("ContactB")
-  meetingPreps      MeetingPrep[]
-  commitmentRecords Commitment[]
-  enrichmentResults    EnrichmentResult[]
-  standingOffers       StandingOffer[]
-  schedulingLeads      SchedulingLead[]
-  lifeEvents           LifeEvent[]
-  referencedResources  ReferencedResource[]
-  dossierVersions      ContactDossier[]
-  ingestionItems       IngestionItem[]
+  interactions           Interaction[]
+  signals                IntelligenceSignal[]
+  outreachItems          OutreachQueue[]
+  relationshipsAsA       ContactRelationship[]   @relation("ContactA")
+  relationshipsAsB       ContactRelationship[]   @relation("ContactB")
+  meetingPreps           MeetingPrep[]
+  commitmentRecords      Commitment[]
+  enrichmentResults      EnrichmentResult[]
+  standingOffers         StandingOffer[]
+  schedulingLeads        SchedulingLead[]
+  lifeEvents             LifeEvent[]
+  referencedResources    ReferencedResource[]
+  dossierVersions        ContactDossier[]
+  ingestionItems         IngestionItem[]
+  pretexts               ContactPretext[]
+  textCommStats          TextContactCommStats[]
+  provenanceAsContact    ContactProvenance[]     @relation("ProvenanceContact")
+  provenanceAsSource     ContactProvenance[]     @relation("ProvenanceSource")
+  friendRelationshipsA   FriendRelationship[]    @relation("FriendA")
+  friendRelationshipsB   FriendRelationship[]    @relation("FriendB")
+  personalActivities     PersonalActivity[]
+  personalGroupMemberships PersonalGroupMember[]
+  personalInterests      PersonalInterest[]
+  socialPlanAttendees    SocialPlanAttendee[]
+  textExtractionProfiles TextExtractionProfile[]
+  textVoiceProfiles      TextVoiceProfile[]
+  socialEventAttendees   SocialEventAttendee[]
+  textMessages           TextMessage[]
+  contentItemsAuthored   ContentItem[]           @relation("ContentAuthor")
+  extractionsAsPrimary   ContentExtraction[]     @relation("ExtractionContact")
+  extractionsAsSecond    ContentExtraction[]     @relation("ExtractionSecondContact")
+  draftCorrections       DraftCorrection[]
+  podcastsAsHost         Podcast[]               @relation("PodcastHost")
+  podcastsAsProducer     Podcast[]               @relation("PodcastProducer")
+  podcastOutreach        PodcastOutreach[]
+  contactInterests       ContactInterest[]
 
   @@index([tier])
   @@index([status])
@@ -88,6 +119,8 @@ model Interaction {
 
   source            String  @default("manual")
   sourceIngestionId String? @map("source_ingestion_id")
+  sourceSystem      String? @map("source_system")
+  sourceId          String? @map("source_id")
   createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contact           Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -95,6 +128,7 @@ model Interaction {
   commitmentRecords Commitment[]
 
   @@index([contactId, date(sort: Desc)])
+  @@index([sourceSystem, sourceId])
   @@map("interactions")
 }
 
@@ -148,7 +182,9 @@ model Event {
   createdAt              String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
   updatedAt              String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
-  outreachItems OutreachQueue[]
+  outreachItems      OutreachQueue[]
+  contentExtractions ContentExtraction[]
+  discoveredEvents   DiscoveredEvent[]
 
   @@index([dateStart])
   @@map("events")
@@ -198,6 +234,8 @@ model ContactRelationship {
   observationSource String? @map("observation_source") // "Jerry mentioned during coffee 3/1"
   observationCount  Int     @default(1) @map("observation_count")
   lastObserved      String? @map("last_observed")
+  sourceSystem      String? @map("source_system")
+  sourceId          String? @map("source_id")
   createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contactA Contact @relation("ContactA", fields: [contactAId], references: [id], onDelete: Cascade)
@@ -263,12 +301,16 @@ model Commitment {
   fulfilledNotes       String? @map("fulfilled_notes")
   reminderSnoozedUntil String? @map("reminder_snoozed_until")
   createdAt            String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  sourceSystem         String? @map("source_system")
+  sourceId             String? @map("source_id")
+  sourceClaimId        String? @map("source_claim_id")
 
   interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
   contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([fulfilled, dueDate])
+  @@index([sourceSystem, sourceId])
   @@map("commitments")
 }
 
@@ -348,6 +390,8 @@ model StandingOffer {
   sourceInteractionId String? @map("source_interaction_id")
   sourceIngestionId   String? @map("source_ingestion_id")
   active              Boolean @default(true)
+  sourceSystem        String? @map("source_system")
+  sourceId            String? @map("source_id")
   createdAt           String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
   usedAt              String? @map("used_at")
 
@@ -355,6 +399,7 @@ model StandingOffer {
 
   @@index([contactId])
   @@index([active])
+  @@index([sourceSystem, sourceId])
   @@map("standing_offers")
 }
 
@@ -368,6 +413,8 @@ model SchedulingLead {
   status            String  @default("open") // open, scheduled, stale, auto_resolved
   linkedEventId     String? @map("linked_event_id")
   sourceIngestionId String? @map("source_ingestion_id")
+  sourceSystem      String? @map("source_system")
+  sourceId          String? @map("source_id")
   createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -375,6 +422,7 @@ model SchedulingLead {
   @@index([contactId])
   @@index([status])
   @@index([resolvedDate])
+  @@index([sourceSystem, sourceId])
   @@map("scheduling_leads")
 }
 
@@ -382,16 +430,20 @@ model LifeEvent {
   id                String  @id @default(uuid())
   contactId         String  @map("contact_id")
   description       String
-  person            String  // who the event is about (the contact or someone in their life)
+  eventType         String  @default("custom") @map("event_type")
+  person            String // who the event is about (the contact or someone in their life)
   eventDate         String? @map("event_date")
   recurring         Boolean @default(false) // birthdays, anniversaries
   sourceIngestionId String? @map("source_ingestion_id")
+  sourceSystem      String? @map("source_system")
+  sourceId          String? @map("source_id")
   createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([eventDate])
+  @@index([sourceSystem, sourceId])
   @@map("life_events")
 }
 
@@ -441,4 +493,660 @@ model LearningSignal {
   @@index([action])
   @@index([createdAt])
   @@map("learning_signals")
+}
+
+model ContactPretext {
+  id          String  @id @default(uuid())
+  contactId   String  @map("contact_id")
+  pretextType String  @map("pretext_type")
+  hook        String
+  strength    String  @default("medium")
+  validFrom   String? @map("valid_from")
+  validUntil  String? @map("valid_until")
+  sourceId    String? @map("source_id")
+  sourceType  String? @map("source_type")
+  used        Boolean @default(false)
+  createdAt   String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([used])
+  @@index([validUntil])
+  @@map("contact_pretexts")
+}
+
+model ContactProvenance {
+  id                  String  @id @default(uuid())
+  contactId           String  @map("contact_id")
+  sourceContactId     String  @map("source_contact_id")
+  type                String
+  eventId             String? @map("event_id")
+  sourceInteractionId String? @map("source_interaction_id")
+  sourceIngestionId   String? @map("source_ingestion_id")
+  notes               String?
+  createdAt           String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact       Contact @relation("ProvenanceContact", fields: [contactId], references: [id], onDelete: Cascade)
+  sourceContact Contact @relation("ProvenanceSource", fields: [sourceContactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, sourceContactId])
+  @@index([contactId])
+  @@index([sourceContactId])
+  @@map("contact_provenance")
+}
+
+model TextContactCommStats {
+  id                          String  @id @default(uuid())
+  contactId                   String? @map("contact_id")
+  phoneNumber                 String  @unique @map("phone_number")
+  totalWeightedScore          Float   @default(0) @map("total_weighted_score")
+  totalMessages               Int     @default(0) @map("total_messages")
+  messagesSent                Int     @default(0) @map("messages_sent")
+  messagesReceived            Int     @default(0) @map("messages_received")
+  firstMessageDate            String? @map("first_message_date")
+  lastMessageDate             String? @map("last_message_date")
+  avgMessagesPerWeek          Float   @default(0) @map("avg_messages_per_week")
+  last30DayCount              Int     @default(0) @map("last_30_day_count")
+  last90DayCount              Int     @default(0) @map("last_90_day_count")
+  reciprocityRatio            Float   @default(0) @map("reciprocity_ratio")
+  responseLatencyAvg          Float?  @map("response_latency_avg")
+  trend                       String  @default("stable")
+  participationRateGroupChats Float   @default(0) @map("participation_rate_group_chats")
+  droppedBall                 Boolean @default(false) @map("dropped_ball")
+  droppedBallSince            String? @map("dropped_ball_since")
+  appleContactName            String? @map("apple_contact_name")
+  triageStatus                String? @map("triage_status")
+  lastComputed                String  @default(dbgenerated("(datetime('now'))")) @map("last_computed")
+
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([contactId])
+  @@index([droppedBall])
+  @@index([totalWeightedScore(sort: Desc)])
+  @@map("text_contact_comm_stats")
+}
+
+model FriendRelationship {
+  id               String  @id @default(uuid())
+  contactAId       String  @map("contact_a_id")
+  contactBId       String  @map("contact_b_id")
+  relationshipType String  @default("know_each_other") @map("relationship_type")
+  source           String  @default("manual")
+  notes            String?
+  createdAt        String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contactA Contact @relation("FriendA", fields: [contactAId], references: [id], onDelete: Cascade)
+  contactB Contact @relation("FriendB", fields: [contactBId], references: [id], onDelete: Cascade)
+
+  @@map("friend_relationships")
+}
+
+model PersonalActivity {
+  id            String  @id @default(uuid())
+  contactId     String  @map("contact_id")
+  activity      String
+  frequency     String  @default("occasional")
+  confidence    String  @default("medium")
+  source        String  @default("manual")
+  lastMentioned String? @map("last_mentioned")
+  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("personal_activities")
+}
+
+model PersonalGroup {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  createdAt   String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  members PersonalGroupMember[]
+
+  @@map("personal_groups")
+}
+
+model PersonalGroupMember {
+  id        String @id @default(uuid())
+  groupId   String @map("group_id")
+  contactId String @map("contact_id")
+  createdAt String @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  group   PersonalGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contact Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("personal_group_members")
+}
+
+model PersonalInterest {
+  id            String  @id @default(uuid())
+  contactId     String  @map("contact_id")
+  interest      String
+  confidence    String  @default("medium")
+  source        String  @default("manual")
+  mentionCount  Int     @default(0) @map("mention_count")
+  lastMentioned String? @map("last_mentioned")
+  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("personal_interests")
+}
+
+model PersonalVenue {
+  id           String  @id @default(uuid())
+  name         String
+  venueType    String  @default("other") @map("venue_type")
+  neighborhood String?
+  city         String  @default("Washington, DC")
+  priceRange   String? @map("price_range")
+  goodFor      String  @default("[]") @map("good_for")
+  notes        String?
+  lastVisited  String? @map("last_visited")
+  timesVisited Int     @default(0) @map("times_visited")
+  latitude     Float?
+  longitude    Float?
+  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  socialPlans  SocialPlan[]
+  socialEvents SocialEvent[]
+
+  @@index([venueType])
+  @@index([neighborhood])
+  @@map("personal_venues")
+}
+
+model SocialPlan {
+  id                  String  @id @default(uuid())
+  planType            String  @map("plan_type")
+  targetDate          String  @map("target_date")
+  suggestedContacts   String  @default("[]") @map("suggested_contacts")
+  suggestedVenueId    String? @map("suggested_venue_id")
+  alternativeVenueIds String  @default("[]") @map("alternative_venue_ids")
+  groupReasoning      String  @default("") @map("group_reasoning")
+  status              String  @default("pending")
+  approvedAt          String? @map("approved_at")
+  completedAt         String? @map("completed_at")
+  createdAt           String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  title               String?
+  time                String?
+  notes               String?
+  publicVisibility    Boolean @default(false) @map("public_visibility")
+  location            String?
+  description         String?
+  coHosted            Boolean @default(false) @map("co_hosted")
+
+  venue          PersonalVenue?       @relation(fields: [suggestedVenueId], references: [id], onDelete: SetNull)
+  attendees      SocialPlanAttendee[]
+
+  @@map("social_plans")
+}
+
+model SocialPlanAttendee {
+  id         String  @id @default(uuid())
+  planId     String  @map("plan_id")
+  contactId  String  @map("contact_id")
+  status     String  @default("invited")
+  wasPlusOne Boolean @default(false) @map("was_plus_one")
+  invitedBy  String? @map("invited_by")
+  createdAt  String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  plan    SocialPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  contact Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("social_plan_attendees")
+}
+
+model TextExtractionProfile {
+  id                    String  @id @default(uuid())
+  contactId             String  @map("contact_id")
+  extractionType        String  @map("extraction_type")
+  interests             String?
+  activities            String?
+  lifeEvents            String? @map("life_events")
+  locationSignals       String? @map("location_signals")
+  keyPeopleMentioned    String? @map("key_people_mentioned")
+  howWeMetSignal        String? @map("how_we_met_signal")
+  typicalTopics         String? @map("typical_topics")
+  availabilityPatterns  String? @map("availability_patterns")
+  openThreads           String? @map("open_threads")
+  communicationStyle    String? @map("communication_style")
+  personalityRead       String? @map("personality_read")
+  emotionalAvailability String? @map("emotional_availability")
+  humorStyle            String? @map("humor_style")
+  reliabilitySignal     String? @map("reliability_signal")
+  whatTheyCareAbout     String? @map("what_they_care_about")
+  howTheySeeYou         String? @map("how_they_see_you")
+  relationshipArc       String? @map("relationship_arc")
+  warmthSignal          String? @map("warmth_signal")
+  initiationPattern     String? @map("initiation_pattern")
+  workingStyle          String? @map("working_style")
+  strategicPriorities   String? @map("strategic_priorities")
+  whatTheyWantFromYou   String? @map("what_they_want_from_you")
+  summary               String?
+  preOutreachBrief      String? @map("pre_outreach_brief")
+  lastExtracted         String  @map("last_extracted")
+  createdAt             String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("text_extraction_profiles")
+}
+
+model TextVoiceProfile {
+  id               String  @id @default(uuid())
+  scope            String
+  contactId        String? @map("contact_id")
+  archetype        String?
+  formality        String  @default("casual")
+  typicalLength    String  @default("short") @map("typical_length")
+  humorLevel       String  @default("medium") @map("humor_level")
+  emojiUsage       String  @default("moderate") @map("emoji_usage")
+  signaturePhrases String  @default("[]") @map("signature_phrases")
+  openerPatterns   String  @default("[]") @map("opener_patterns")
+  signOffPatterns  String  @default("[]") @map("sign_off_patterns")
+  styleNotes       String? @map("style_notes")
+  sampleMessages   String  @default("[]") @map("sample_messages")
+  lastExtracted    String  @map("last_extracted")
+  createdAt        String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@map("text_voice_profiles")
+}
+
+// ─── Missing models (added to fix runtime errors) ───
+
+model PersonalNudge {
+  id              String  @id @default(uuid())
+  nudgeType       String  @map("nudge_type")
+  contactIds      String  @default("[]") @map("contact_ids")
+  reasoning       String?
+  suggestedAction String? @map("suggested_action")
+  status          String  @default("pending")
+  scheduledFor    String? @map("scheduled_for")
+  completedAt     String? @map("completed_at")
+  createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  @@index([status])
+  @@index([scheduledFor])
+  @@map("personal_nudges")
+}
+
+model SocialEvent {
+  id               String  @id @default(uuid())
+  eventType        String  @default("other") @map("event_type")
+  title            String?
+  date             String
+  time             String?
+  venueId          String? @map("venue_id")
+  venueName        String? @map("venue_name")
+  coHosted         Boolean @default(false) @map("co_hosted")
+  notes            String?
+  publicVisibility Boolean @default(false) @map("public_visibility")
+  location         String?
+  description      String?
+  createdAt        String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  venue          PersonalVenue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  attendees      SocialEventAttendee[]
+  inviteRequests InviteRequest[]
+
+  @@index([date])
+  @@index([eventType])
+  @@map("social_events")
+}
+
+model SocialEventAttendee {
+  id         String  @id @default(uuid())
+  eventId    String  @map("event_id")
+  contactId  String  @map("contact_id")
+  status     String  @default("invited")
+  wasPlusOne Boolean @default(false) @map("was_plus_one")
+  invitedBy  String? @map("invited_by")
+  createdAt  String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  event   SocialEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  contact Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, contactId])
+  @@index([eventId])
+  @@index([contactId])
+  @@map("social_event_attendees")
+}
+
+model InviteRequest {
+  id         String  @id @default(uuid())
+  name       String
+  phone      String
+  howKnowMe  String? @map("how_know_me")
+  eventId    String? @map("event_id")
+  status     String  @default("pending")
+  createdAt  String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  reviewedAt String? @map("reviewed_at")
+
+  event SocialEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("invite_requests")
+}
+
+model TextGroupChat {
+  id               String  @id @default(uuid())
+  chatDbIdentifier String  @unique @map("chat_db_identifier")
+  name             String?
+  participantCount Int     @map("participant_count")
+  participants     String  @default("[]")
+  firstMessage     String? @map("first_message")
+  lastMessage      String? @map("last_message")
+  isActive         Boolean @default(true) @map("is_active")
+
+  messages TextMessage[]
+
+  @@map("text_group_chats")
+}
+
+model TextMessage {
+  id             String  @id @default(uuid())
+  contactId      String? @map("contact_id")
+  phoneNumber    String  @map("phone_number")
+  direction      String
+  content        String
+  timestamp      String
+  isGroupMessage Boolean @default(false) @map("is_group_message")
+  groupChatId    String? @map("group_chat_id")
+  groupSize      Int?    @map("group_size")
+  weight         Float   @default(1.0)
+  chatDbRowId    Int     @map("chat_db_row_id")
+  ingestedAt     String  @default(dbgenerated("(datetime('now'))")) @map("ingested_at")
+
+  contact   Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  groupChat TextGroupChat? @relation(fields: [groupChatId], references: [id], onDelete: SetNull)
+
+  @@index([contactId])
+  @@index([phoneNumber])
+  @@index([timestamp])
+  @@index([chatDbRowId])
+  @@index([groupChatId])
+  @@map("text_messages")
+}
+
+model TextSyncMetadata {
+  id                String  @id @default(uuid())
+  lastSuccessfulRun String? @map("last_successful_run")
+  lastMessageRowId  Int     @default(0) @map("last_message_row_id")
+  lastRunStatus     String  @default("never_run") @map("last_run_status")
+  messagesProcessed Int     @default(0) @map("messages_processed")
+  errors            String  @default("[]")
+  updatedAt         String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  @@map("text_sync_metadata")
+}
+
+model ContentItem {
+  id                  String  @id @default(uuid())
+  sourceType          String  @map("source_type")
+  title               String
+  author              String?
+  authorContactId     String? @map("author_contact_id")
+  publication         String?
+  publishedAt         String? @map("published_at")
+  sourceUrl           String? @map("source_url")
+  fullText            String? @map("full_text")
+  summary             String?
+  ingestionStatus     String  @default("pending") @map("ingestion_status")
+  ingestedAt          String? @map("ingested_at")
+  wordCount           Int?    @map("word_count")
+  topicRelevanceScore Float   @default(0) @map("topic_relevance_score")
+  topicTags           String  @default("[]") @map("topic_tags")
+  articleType         String? @map("article_type")
+  coreEvent           String? @map("core_event")
+  whyItMatters        String? @map("why_it_matters")
+  notes               String?
+  createdAt           String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  authorContact   Contact?            @relation("ContentAuthor", fields: [authorContactId], references: [id], onDelete: SetNull)
+  extractions     ContentExtraction[]
+  podcastEpisodes PodcastEpisode[]
+
+  @@index([sourceType, publishedAt(sort: Desc)])
+  @@index([topicRelevanceScore(sort: Desc)])
+  @@index([ingestionStatus])
+  @@map("content_items")
+}
+
+model ContentExtraction {
+  id                String  @id @default(uuid())
+  contentItemId     String  @map("content_item_id")
+  extractionType    String  @map("extraction_type")
+  summary           String
+  rawQuote          String? @map("raw_quote")
+  contactId         String? @map("contact_id")
+  secondContactId   String? @map("second_contact_id")
+  eventId           String? @map("event_id")
+  discoveredName    String? @map("discovered_name")
+  discoveredTitle   String? @map("discovered_title")
+  discoveredOrg     String? @map("discovered_org")
+  discoveredContext String? @map("discovered_context")
+  topic             String?
+  position          String?
+  confidence        String  @default("medium")
+  urgency           String?
+  isNewPosition     Boolean @default(false) @map("is_new_position")
+  actionableBy      String? @map("actionable_by")
+  networkStatus     String? @map("network_status")
+  processed         Boolean @default(false)
+  processedAction   String? @map("processed_action")
+  discoverySource   String? @map("discovery_source")
+  podcastEpisodeId  String? @map("podcast_episode_id")
+  createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  contact       Contact?    @relation("ExtractionContact", fields: [contactId], references: [id], onDelete: SetNull)
+  secondContact Contact?    @relation("ExtractionSecondContact", fields: [secondContactId], references: [id], onDelete: SetNull)
+  event         Event?      @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([contentItemId])
+  @@index([extractionType])
+  @@index([contactId])
+  @@index([processed])
+  @@map("content_extractions")
+}
+
+model EventSource {
+  id              String  @id @default(uuid())
+  name            String
+  url             String
+  sourceType      String  @map("source_type")
+  category        String
+  scrapeFrequency String  @map("scrape_frequency")
+  topicFilters    String  @default("[]") @map("topic_filters")
+  parserConfig    String  @default("{}") @map("parser_config")
+  enabled         Boolean @default(true)
+  lastScrapedAt   String? @map("last_scraped_at")
+  lastResultCount Int     @default(0) @map("last_result_count")
+  lastError       String? @map("last_error")
+  notes           String?
+  createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  discoveredEvents DiscoveredEvent[]
+
+  @@map("event_sources")
+}
+
+model DiscoveredEvent {
+  id                  String  @id @default(uuid())
+  sourceId            String  @map("source_id")
+  rawTitle            String  @map("raw_title")
+  rawDescription      String? @map("raw_description")
+  rawDate             String? @map("raw_date")
+  rawLocation         String? @map("raw_location")
+  rawUrl              String? @map("raw_url")
+  rawSpeakers         String? @map("raw_speakers")
+  scrapedAt           String  @default(dbgenerated("(datetime('now'))")) @map("scraped_at")
+  status              String  @default("new")
+  topicRelevanceScore Float?  @map("topic_relevance_score")
+  classificationNotes String? @map("classification_notes")
+  hasCfp              Boolean @default(false) @map("has_cfp")
+  cfpDeadline         String? @map("cfp_deadline")
+  promotedEventId     String? @map("promoted_event_id")
+  dismissedReason     String? @map("dismissed_reason")
+
+  source         EventSource      @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  promotedEvent  Event?           @relation(fields: [promotedEventId], references: [id], onDelete: SetNull)
+  triageFeedback TriageFeedback[]
+
+  @@index([status])
+  @@index([sourceId, scrapedAt(sort: Desc)])
+  @@index([topicRelevanceScore(sort: Desc)])
+  @@map("discovered_events")
+}
+
+model DraftCorrection {
+  id            String  @id @default(uuid())
+  contactId     String? @map("contact_id")
+  purpose       String
+  originalDraft String  @map("original_draft")
+  editedDraft   String  @map("edited_draft")
+  voiceSource   String  @default("") @map("voice_source")
+  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([contactId])
+  @@index([purpose])
+  @@map("draft_corrections")
+}
+
+model IntelBrief {
+  id           String @id @default(uuid())
+  weekStart    String @unique @map("week_start")
+  weekEnd      String @map("week_end")
+  content      String
+  contentStats String @default("{}") @map("content_stats")
+  generatedAt  String @default(dbgenerated("(datetime('now'))")) @map("generated_at")
+
+  @@map("intel_briefs")
+}
+
+model Podcast {
+  id                     String  @id @default(uuid())
+  name                   String
+  host                   String?
+  hostContactId          String? @map("host_contact_id")
+  producerName           String? @map("producer_name")
+  producerContactId      String? @map("producer_contact_id")
+  producerEmail          String? @map("producer_email")
+  pitchEmail             String? @map("pitch_email")
+  rssFeedUrl             String? @map("rss_feed_url")
+  websiteUrl             String? @map("website_url")
+  audienceDescription    String? @map("audience_description")
+  audienceSize           Int?    @map("audience_size")
+  topicAlignment         Float   @default(0) @map("topic_alignment")
+  tier                   Int     @default(2)
+  status                 String  @default("monitoring")
+  lastEpisodeMonitoredAt String? @map("last_episode_monitored_at")
+  notes                  String?
+  createdAt              String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt              String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  hostContact     Contact?          @relation("PodcastHost", fields: [hostContactId], references: [id], onDelete: SetNull)
+  producerContact Contact?          @relation("PodcastProducer", fields: [producerContactId], references: [id], onDelete: SetNull)
+  episodes        PodcastEpisode[]
+  outreach        PodcastOutreach[]
+
+  @@index([status])
+  @@index([tier])
+  @@map("podcasts")
+}
+
+model PodcastEpisode {
+  id                   String  @id @default(uuid())
+  podcastId            String  @map("podcast_id")
+  title                String
+  publishedAt          String? @map("published_at")
+  description          String?
+  episodeUrl           String? @map("episode_url")
+  audioUrl             String? @map("audio_url")
+  durationMinutes      Int?    @map("duration_minutes")
+  topicRelevanceScore  Float   @default(0) @map("topic_relevance_score")
+  topicTags            String  @default("[]") @map("topic_tags")
+  isPitchWindow        Boolean @default(false) @map("is_pitch_window")
+  ingestionStatus      String  @default("pending") @map("ingestion_status")
+  transcriptText       String? @map("transcript_text")
+  guestNames           String  @default("[]") @map("guest_names")
+  guestExtractions     String? @map("guest_extractions")
+  pitchWindowExpiresAt String? @map("pitch_window_expires_at")
+  triageStatus         String  @default("new") @map("triage_status")
+  contentItemId        String? @map("content_item_id")
+  notes                String?
+  createdAt            String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  podcast     Podcast      @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  contentItem ContentItem? @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+
+  @@index([podcastId, publishedAt(sort: Desc)])
+  @@index([isPitchWindow])
+  @@index([ingestionStatus])
+  @@map("podcast_episodes")
+}
+
+model PodcastOutreach {
+  id               String  @id @default(uuid())
+  podcastId        String  @map("podcast_id")
+  contactId        String  @map("contact_id")
+  outreachType     String  @map("outreach_type")
+  subject          String?
+  body             String?
+  sentAt           String? @map("sent_at")
+  responseReceived Boolean @default(false) @map("response_received")
+  responseDate     String? @map("response_date")
+  responseContent  String? @map("response_content")
+  outcome          String  @default("pending")
+  notes            String?
+  createdAt        String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  @@index([podcastId, createdAt(sort: Desc)])
+  @@index([outcome])
+  @@map("podcast_outreach")
+}
+
+model TriageFeedback {
+  id                String  @id @default(uuid())
+  discoveredEventId String  @map("discovered_event_id")
+  feedbackType      String  @map("feedback_type")
+  title             String
+  sourceCategory    String  @map("source_category")
+  sourceName        String  @map("source_name")
+  originalScore     Int?    @map("original_score")
+  reason            String?
+  createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  discoveredEvent DiscoveredEvent @relation(fields: [discoveredEventId], references: [id])
+
+  @@index([feedbackType])
+  @@index([createdAt])
+  @@map("triage_feedback")
+}
+
+model ContactInterest {
+  id           String  @id @default(uuid())
+  contactId    String  @map("contact_id")
+  interest     String
+  confidence   String  @default("medium")
+  source       String  @default("manual")
+  mentionCount Int     @default(0) @map("mention_count")
+  lastMentioned String? @map("last_mentioned")
+  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("contact_interests")
 }

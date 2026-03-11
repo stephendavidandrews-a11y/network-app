@@ -42,6 +42,7 @@ export async function PUT(
       tags: JSON.stringify(body.tags || []),
       targetCadenceDays: body.targetCadenceDays,
       status: body.status,
+      ...(body.contactType !== undefined && { contactType: body.contactType }),
       introductionPathway: body.introductionPathway,
       connectionToHawleyOrbit: body.connectionToHawleyOrbit,
       whyTheyMatter: body.whyTheyMatter,

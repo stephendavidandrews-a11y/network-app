@@ -458,6 +458,7 @@ export interface ConfirmManifest {
   contactFieldsUpdated?: string[]  // which contact fields were enriched
   dossierVersion?: number
   calendarEventIds?: string[]      // Google Calendar events created
+  provenanceId?: string            // provenance link created
 }
 
 export interface StandingOfferRecord {
@@ -592,4 +593,118 @@ export interface DebriefExtraction {
   topicsDiscussed: string[]
   // Legacy compat — populated from myCommitments for downstream consumers
   commitments: Array<{ description: string; dueDate: string | null }>
+  // Personal mode (only populated for personal/both contacts)
+  personalInterests?: string[]
+  personalActivities?: string[]
+  lifeEventsMentioned?: Array<{ eventType: string; description: string; date: string | null }>
+}
+
+// ── Contact Provenance Types ──
+
+export interface ProvenanceSuggestion {
+  sourceContactId: string
+  sourceContactName: string
+  sourceOrg: string | null
+  outreachDate: string
+  outreachSubject: string | null
+  matchReason: 'same_org' | 'same_domain'
+}
+
+export interface ProvenanceAnnotation {
+  type: 'routing' | 'referral' | 'met_at'
+  sourceContactId: string
+  sourceContactName?: string
+  eventId?: string
+  sourceInteractionId?: string
+  notes?: string
+}
+
+export interface ContactProvenanceRecord {
+  id: string
+  contactId: string
+  sourceContactId: string
+  type: 'routing' | 'referral' | 'met_at'
+  eventId: string | null
+  sourceInteractionId: string | null
+  sourceIngestionId: string | null
+  notes: string | null
+  createdAt: string
+  // Enriched
+  sourceContactName?: string
+  sourceContactOrg?: string | null
+  contactName?: string
+  contactOrg?: string | null
+}
+
+
+// ── Visibility Engine Types ──
+
+export type EventSourceType = 'scrape' | 'rss' | 'api' | 'tribe_api' | 'newsletter' | 'manual'
+
+export type EventSourceCategory =
+  | 'industry_conference' | 'legal' | 'academic' | 'government'
+  | 'think_tank' | 'law_firm' | 'dc_local' | 'news' | 'podcast'
+
+export type DiscoveredEventStatus = 'new' | 'classified' | 'promoted' | 'dismissed' | 'triaged' | 'filtered' | 'ingested' | 'needs_fetch' | 'paywall_blocked'
+
+export interface EventSourceRecord {
+  id: string
+  name: string
+  url: string
+  sourceType: EventSourceType
+  category: EventSourceCategory
+  scrapeFrequency: string
+  topicFilters: string[]
+  parserConfig: Record<string, unknown>
+  enabled: boolean
+  lastScrapedAt: string | null
+  lastResultCount: number
+  lastError: string | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface DiscoveredEventRecord {
+  id: string
+  sourceId: string
+  rawTitle: string
+  rawDescription: string | null
+  rawDate: string | null
+  rawLocation: string | null
+  rawUrl: string | null
+  rawSpeakers: string | null
+  scrapedAt: string
+  status: DiscoveredEventStatus
+  topicRelevanceScore: number | null
+  classificationNotes: string | null
+  hasCfp: boolean
+  cfpDeadline: string | null
+  promotedEventId: string | null
+  dismissedReason: string | null
+  // Enriched
+  sourceName?: string
+  sourceCategory?: string
+}
+
+export type JobType =
+  | 'scrape_source' | 'classify_events' | 'transcribe_episode'
+  | 'ingest_article' | 'extract_content' | 'generate_brief' | 'sync_calendar'
+
+export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'retrying'
+
+export interface JobQueueRecord {
+  id: string
+  jobType: JobType
+  targetId: string | null
+  targetType: string | null
+  payload: Record<string, unknown>
+  priority: number
+  scheduledFor: string | null
+  status: JobStatus
+  startedAt: string | null
+  completedAt: string | null
+  error: string | null
+  retryCount: number
+  maxRetries: number
+  createdAt: string
 }

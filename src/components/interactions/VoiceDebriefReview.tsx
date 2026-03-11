@@ -297,7 +297,38 @@ export function VoiceDebriefReview({
 
       setSaved(true)
       setTimeout(() => {
-        router.push(`/contacts/${contactId}`)
+        // Save personal data (fire and forget — don't block navigation)
+      const personalSaves: Promise<unknown>[] = []
+      if (extraction.personalInterests?.length) {
+        extraction.personalInterests.forEach(interest => {
+          personalSaves.push(fetch('/api/personal/interests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contactId, interest, confidence: 'medium', source: 'voice_debrief' }),
+          }).catch(() => {}))
+        })
+      }
+      if (extraction.personalActivities?.length) {
+        extraction.personalActivities.forEach(activity => {
+          personalSaves.push(fetch('/api/personal/activities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contactId, activity, confidence: 'medium', source: 'voice_debrief', frequency: 'occasional' }),
+          }).catch(() => {}))
+        })
+      }
+      if (extraction.lifeEventsMentioned?.length) {
+        extraction.lifeEventsMentioned.forEach(le => {
+          personalSaves.push(fetch(`/api/contacts/${contactId}/life-events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventType: le.eventType, description: le.description, eventDate: le.date }),
+          }).catch(() => {}))
+        })
+      }
+      Promise.all(personalSaves).catch(() => {})
+
+      router.push(`/contacts/${contactId}`)
         router.refresh()
       }, 1500)
     } catch (error) {
@@ -643,6 +674,52 @@ export function VoiceDebriefReview({
           </div>
         </div>
       )}
+
+      {/* Personal Data (interests, activities, life events) */}
+      {(extraction.personalInterests?.length || extraction.personalActivities?.length || extraction.lifeEventsMentioned?.length) ? (
+        <div className="rounded-lg border border-pink-200 bg-pink-50 p-4">
+          <h3 className="text-sm font-semibold text-pink-800 mb-3">Personal Data Extracted</h3>
+
+          {extraction.personalInterests && extraction.personalInterests.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs text-pink-600 font-medium mb-1">Interests</p>
+              <div className="flex flex-wrap gap-1">
+                {extraction.personalInterests.map((interest, i) => (
+                  <span key={i} className="rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-700">{interest}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {extraction.personalActivities && extraction.personalActivities.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs text-pink-600 font-medium mb-1">Activities</p>
+              <div className="flex flex-wrap gap-1">
+                {extraction.personalActivities.map((activity, i) => (
+                  <span key={i} className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{activity}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {extraction.lifeEventsMentioned && extraction.lifeEventsMentioned.length > 0 && (
+            <div>
+              <p className="text-xs text-pink-600 font-medium mb-1">Life Events</p>
+              <div className="space-y-1">
+                {extraction.lifeEventsMentioned.map((le, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className="rounded bg-gray-200 px-1.5 py-0.5 text-gray-600">{le.eventType}</span>
+                    <span className="text-gray-700">{le.description}</span>
+                    {le.date && <span className="text-gray-400">{le.date}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] text-pink-400 mt-2">These will be saved to the contact&apos;s personal profile on save.</p>
+        </div>
+      ) : null}
 
       {/* Relationship Notes */}
       {extraction.relationshipNotes && (

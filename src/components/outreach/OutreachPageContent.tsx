@@ -54,7 +54,7 @@ export function OutreachPageContent({ queue, history }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Outreach</h1>
         <div className="flex rounded-md border">
           <button onClick={() => setActiveTab('queue')}
@@ -78,9 +78,9 @@ export function OutreachPageContent({ queue, history }: Props) {
           <div className="space-y-3">
             {queue.map(item => (
               <div key={item.id} className="rounded-lg border bg-white p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-600">P{item.priority}</span>
                       <span className={cn('inline-flex h-5 items-center rounded border px-1.5 text-xs font-medium', TIER_COLORS[item.contactTier])}>
                         T{item.contactTier}
@@ -105,7 +105,7 @@ export function OutreachPageContent({ queue, history }: Props) {
                     )}
                   </div>
 
-                  <div className="flex flex-col gap-1.5 ml-4">
+                  <div className="flex flex-row sm:flex-col gap-1.5">
                     <button onClick={() => handleAction(item.id, 'approve')}
                       className="flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
                       <CheckCircle className="h-3 w-3" /> Approve

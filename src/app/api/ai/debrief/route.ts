@@ -33,6 +33,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   }
 
+  // Check if this is a personal/social contact
+  const contactType = (contact as Record<string, unknown>).contactType as string || 'professional'
+  const isPersonal = contactType === 'personal' || contactType === 'both'
+
   // Unfulfilled commitments from the Commitment table
   const existingCommitments = await prisma.commitment.findMany({
     where: { contactId, fulfilled: false },
@@ -141,7 +145,10 @@ Return ONLY valid JSON in this exact format:
   "newContactsMentioned": [{"name": "string", "org": "string or null", "context": "why they came up"}],
   "followUps": [{"description": "Action item (not a formal commitment)", "originalWords": "exact words from transcript"}],
   "relationshipNotes": "Observations about relationship quality, changes in contact's situation, strategic insights",
-  "topicsDiscussed": ["keyword1", "keyword2"]
+  "topicsDiscussed": ["keyword1", "keyword2"],
+  "personalInterests": ["interest1", "interest2"],
+  "personalActivities": ["activity1", "activity2"],
+  "lifeEventsMentioned": [{"eventType": "birthday|anniversary|move|job_change|milestone|custom", "description": "string", "date": "YYYY-MM-DD or null"}]
 }
 
 ## Event vs Commitment vs Follow-Up Distinction
@@ -164,7 +171,14 @@ IMPORTANT: When the speaker mentions multiple events/commitments, extract EACH O
 - If only a time is mentioned without a date, assume today (${todayStr})
 
 If a field has no relevant content, use an empty array [] or empty string "".
-Do NOT include any text outside the JSON object.`
+Do NOT include any text outside the JSON object.
+
+${isPersonal ? `## Personal/Social Context
+This contact is a PERSONAL friend (not just professional). Pay special attention to:
+- Personal interests they mention (hobbies, sports, music, food preferences, etc.) → personalInterests
+- Activities they do or want to do (hiking, book club, gym, cooking, etc.) → personalActivities
+- Life events mentioned (birthdays, moves, job changes, health news, milestones) → lifeEventsMentioned
+- Even if the conversation is casual, extract these personal data points. They help maintain the friendship.` : ''}`
 
   // ── Assemble User Prompt with Rich Context ──
 
@@ -308,6 +322,22 @@ Extract the structured information now. Remember to resolve any temporal referen
         ? (raw.topicsDiscussed as string[]).map(String)
         : [],
       commitments: legacyCommitments,
+      // Personal mode fields
+      ...(isPersonal && {
+        personalInterests: Array.isArray(raw.personalInterests)
+          ? (raw.personalInterests as string[]).map(String)
+          : [],
+        personalActivities: Array.isArray(raw.personalActivities)
+          ? (raw.personalActivities as string[]).map(String)
+          : [],
+        lifeEventsMentioned: Array.isArray(raw.lifeEventsMentioned)
+          ? (raw.lifeEventsMentioned as Array<Record<string, unknown>>).map(le => ({
+              eventType: String(le.eventType || 'custom'),
+              description: String(le.description || ''),
+              date: (le.date as string) || null,
+            }))
+          : [],
+      }),
     }
 
     return NextResponse.json({ extraction })

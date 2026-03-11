@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
+import { MobileSidebarProvider } from '@/components/layout/MobileSidebarContext'
 
 // Force all authenticated pages to render at runtime (not build time)
 // so they can access the SQLite database
@@ -20,14 +21,16 @@ export default async function AuthenticatedLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-          {children}
-        </main>
+    <MobileSidebarProvider>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header />
+          <main className="flex-1 overflow-y-auto bg-gray-50 p-3 md:p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </MobileSidebarProvider>
   )
 }

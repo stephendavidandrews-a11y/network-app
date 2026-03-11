@@ -60,6 +60,8 @@ export async function GET(request: NextRequest) {
       reviewedAt: item.reviewedAt,
       extraction: safeParseJSON(item.extraction),
       manifest: item.manifest ? safeParseJSON(item.manifest) : null,
+      // Include raw content for email items so inbox can show email addresses
+      emailAddresses: item.source === 'email' ? extractEmailAddresses(item.rawContent) : null,
     }))
 
     // Stats
@@ -89,6 +91,19 @@ export async function GET(request: NextRequest) {
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+/**
+ * Extract email addresses from raw email content.
+ * Returns all unique email addresses found (from headers and body).
+ */
+function extractEmailAddresses(rawContent: string): string[] {
+  const emailRegex = /[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}/g
+  const matches = rawContent.match(emailRegex) || []
+  // Deduplicate and filter out notes@ (the ingestion address)
+  const unique = Array.from(new Set(matches.map(e => e.toLowerCase())))
+    .filter(e => !e.startsWith('notes@'))
+  return unique
 }
 
 function safeParseJSON(str: string): unknown {

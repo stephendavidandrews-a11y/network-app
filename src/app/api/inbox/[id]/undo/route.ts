@@ -46,6 +46,16 @@ export async function POST(
 
     // Delete in reverse dependency order
 
+    // Provenance
+    if (manifest.provenanceId) {
+      await prisma.contactProvenance.delete({
+        where: { id: manifest.provenanceId },
+      }).catch(() => {
+        // May already be deleted
+      })
+      undone.push('1 provenance link')
+    }
+
     // Relationships
     if (manifest.relationshipIds && manifest.relationshipIds.length > 0) {
       await prisma.contactRelationship.deleteMany({

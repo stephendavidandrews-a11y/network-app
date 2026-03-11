@@ -11,6 +11,18 @@
 import { ImapFlow } from 'imapflow'
 import { processIngestion } from '@/lib/ingestion/process'
 
+/**
+ * The user's own email addresses.
+ * When an email is FROM one of these, the contact is the recipient (To), not the sender.
+ * This handles the case where the user CCs notes@ on an outgoing email.
+ */
+const MY_EMAIL_ADDRESSES = [
+  'notes@stephenandrews.org',
+  'stephen_andrews@hawley.senate.gov',
+  'stephen.david.andrews@gmail.com',
+  'stephen@stephenandrews.org',
+]
+
 interface EmailPollResult {
   processed: number
   skipped: number
@@ -327,19 +339,35 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
           const fromAddr = parsed.from ||
             (env?.from?.[0] ? `${env.from[0].name || ''} <${env.from[0].address}>`.trim() : null)
 
-          const contactHint = fromAddr
-            ? extractName(fromAddr) || extractEmail(fromAddr)
-            : undefined
+          const toAddr = parsed.to ||
+            (env?.to?.[0] ? `${env.to[0].name || ''} <${env.to[0].address}>`.trim() : null)
 
-          console.log(`[EmailPoll] UID ${uid} contactHint=${contactHint}, fromAddr=${fromAddr}`)
+          // Check if sender is the user themselves (e.g., CC'd notes@ on outgoing email)
+          // If so, the contact is the recipient, not the sender
+          const fromEmail = fromAddr ? extractEmail(fromAddr).toLowerCase() : ''
+          const isSentByUser = MY_EMAIL_ADDRESSES.some(addr => addr.toLowerCase() === fromEmail)
+
+          let contactHint: string | undefined
+          if (isSentByUser && toAddr) {
+            // User sent this email — contact is whoever they sent it TO
+            contactHint = extractName(toAddr) || extractEmail(toAddr)
+            console.log(`[EmailPoll] UID ${uid} sent by user (${fromEmail}), using To for contact: ${contactHint}`)
+          } else {
+            contactHint = fromAddr
+              ? extractName(fromAddr) || extractEmail(fromAddr)
+              : undefined
+          }
+
+          console.log(`[EmailPoll] UID ${uid} contactHint=${contactHint}, fromAddr=${fromAddr}, toAddr=${toAddr}`)
 
           const processResult = await processIngestion({
             source: 'email',
             content: parsed.body || textContent,
             contactHint,
             metadata: {
-              originalFrom: fromAddr || undefined,
-              originalTo: parsed.to || (env?.to?.[0]?.address) || undefined,
+              // When sent by user, swap from/to so contact matching uses the recipient
+              originalFrom: isSentByUser ? (toAddr || undefined) : (fromAddr || undefined),
+              originalTo: isSentByUser ? (fromAddr || undefined) : (parsed.to || (env?.to?.[0]?.address) || undefined),
               subject: parsed.subject || env?.subject || undefined,
               signature: parsed.signature || undefined,
             },

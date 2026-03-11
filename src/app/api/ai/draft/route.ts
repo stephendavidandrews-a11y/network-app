@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import Anthropic from '@anthropic-ai/sdk'
+import { shouldGenerateOutreach, getCurrentRole, getBestPretext } from '@/lib/outreach/pretext-selector'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -27,6 +28,31 @@ export async function POST(request: NextRequest) {
   if (!contact) {
     return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
   }
+
+  // --- Pathway Intelligence: Outreach Gating ---
+  const gating = await shouldGenerateOutreach(
+    {
+      id: contact.id,
+      outreachMode: (contact as Record<string, unknown>).outreachMode as string || 'direct',
+      accessibility: (contact as Record<string, unknown>).accessibility as string || 'high',
+      outreachTiming: (contact as Record<string, unknown>).outreachTiming as string | null,
+      organization: contact.organization,
+    },
+    prisma
+  )
+
+  if (!gating.proceed) {
+    return NextResponse.json({
+      gated: true,
+      reason: gating.reason,
+      redirectContactId: gating.redirectContactId || null,
+      redirectContactName: gating.redirectContactName || null,
+    }, { status: 422 })
+  }
+
+  // Load pretext and role context for draft
+  const roleTransition = await getCurrentRole(prisma)
+  const bestPretext = gating.pretext || await getBestPretext(contactId, prisma)
 
   // Fetch style guide and expertise profile
   const settings = await prisma.appSetting.findMany({
@@ -74,6 +100,15 @@ export async function POST(request: NextRequest) {
       description: triggerDescription || '',
       signalContext: signalContext || null,
     },
+    pretext: bestPretext ? {
+      type: bestPretext.pretextType,
+      hook: bestPretext.hook,
+      strength: bestPretext.strength,
+    } : null,
+    roleContext: roleTransition ? {
+      currentRole: roleTransition.current_role,
+      roleLabel: roleTransition.current_role_label,
+    } : null,
   }
 
   const draftFormat = format || 'email'
@@ -115,6 +150,14 @@ TRIGGER FOR OUTREACH:
 - Type: ${triggerType || 'manual'}
 - Context: ${triggerDescription || 'General networking touch'}
 ${signalContext ? `- Signal: ${signalContext}` : ''}
+${bestPretext ? `
+PRETEXT/HOOK FOR THIS OUTREACH:
+- Type: ${bestPretext.pretextType}
+- Hook: ${bestPretext.hook}
+- Strength: ${bestPretext.strength}
+Use this hook as the basis for the outreach. It provides the reason and framing for reaching out.` : ''}
+${roleTransition ? `
+YOUR CURRENT ROLE: ${roleTransition.current_role_label}` : ''}
 
 RECENT INTERACTIONS:
 ${contact.interactions.length > 0
@@ -159,6 +202,7 @@ Draft the ${draftFormat} now.`
     return NextResponse.json({
       subject,
       body: draftBody,
+      gatingNote: gating.reason || null,
       contextPackage: JSON.stringify(contextPackage),
       model: 'claude-sonnet-4-20250514',
       format: draftFormat,

@@ -13,6 +13,16 @@ interface ScoringInteraction {
   date: string
 }
 
+export interface CommStatsForScoring {
+  totalMessages: number
+  avgMessagesPerWeek: number | null
+  last30DayCount: number | null
+  last90DayCount: number | null
+  lastMessageDate: string | null
+  reciprocityRatio: number | null
+  trend: string | null
+}
+
 const INTERACTION_DEPTH: Record<string, number> = {
   meeting: 10,
   coffee: 9,
@@ -58,10 +68,36 @@ export function calculateOutreachPriority(
   return Math.min(Math.round(priority), 100)
 }
 
+/**
+ * Compute relationship strength from text message data.
+ * Returns 0–8 (capped — reserve 9-10 for contacts with both texts AND in-person history).
+ */
+export function computeTextRelationshipScore(stats: CommStatsForScoring): number {
+  const textRecencyDays = stats.lastMessageDate ? daysSince(stats.lastMessageDate) : null
+  const textRecency = textRecencyDays !== null
+    ? 10 - Math.min(textRecencyDays / 30, 10)
+    : 0
+
+  const weeklyRate = stats.avgMessagesPerWeek || 0
+  const textFrequency = Math.min(weeklyRate / 5, 1.0) * 10 // 5+ msgs/week = max
+
+  const textDepth = Math.min(stats.totalMessages / 1000, 1.0) * 6 // 1000+ msgs = max (capped at 6)
+
+  const raw = (textRecency * 0.4) + (textFrequency * 0.3) + (textDepth * 0.3)
+  return Math.round(Math.min(raw, 8.0) * 10) / 10
+}
+
+/**
+ * Compute relationship strength — blends logged interactions with text message data.
+ * Takes the higher of the two sub-scores so a strong text relationship isn't diluted
+ * by zero logged interactions.
+ */
 export function calculateRelationshipStrength(
   contact: ScoringContact,
-  interactions: ScoringInteraction[]
+  interactions: ScoringInteraction[],
+  commStats?: CommStatsForScoring | null
 ): number {
+  // Interaction-based score (original formula)
   const days = daysSince(contact.lastInteractionDate)
   const recency = days !== null ? 10 - Math.min(days / 30, 10) : 0
 
@@ -77,7 +113,13 @@ export function calculateRelationshipStrength(
     ? recentInteractions.reduce((sum, i) => sum + (INTERACTION_DEPTH[i.type] || 3), 0) / recentInteractions.length
     : 0
 
-  const strength = (recency * 0.4) + (frequency * 0.3) + (avgDepth * 0.3)
+  const interactionScore = (recency * 0.4) + (frequency * 0.3) + (avgDepth * 0.3)
+
+  // Text-based score
+  const textScore = commStats ? computeTextRelationshipScore(commStats) : 0
+
+  // Take the higher of the two
+  const strength = Math.max(interactionScore, textScore)
   return Math.round(Math.min(strength, 10) * 10) / 10
 }
 

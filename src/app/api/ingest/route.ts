@@ -35,6 +35,7 @@ function parseForwardedEmail(raw: string): {
   headers: {
     from?: string
     to?: string
+    cc?: string
     subject?: string
     date?: string
   }
@@ -83,6 +84,7 @@ function parseForwardedEmail(raw: string): {
     headers: {
       from: headers.from,
       to: headers.to,
+      cc: headers.cc,
       subject: headers.subject,
       date: headers.date,
     },
@@ -254,7 +256,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body: IngestRequest = await request.json()
+    // ── Parse request body (JSON or multipart form) ──
+    let body: IngestRequest
+    const contentType = request.headers.get('content-type') || ''
+    if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      // Form upload (from iOS Shortcuts)
+      const formData = await request.formData()
+      const source = formData.get('source') as string || 'voice'
+      const contactHint = formData.get('contactHint') as string || ''
+      const content = formData.get('content') as string || ''
+      const audioFileRaw = formData.get('audioFile')
+      const audioBase64Field = formData.get('audioBase64') as string || ''
+      let audioBase64 = audioBase64Field
+      if (audioFileRaw && !audioBase64) {
+        // Convert uploaded file to base64
+        let fileBuffer: Buffer
+        if (typeof (audioFileRaw as any).arrayBuffer === 'function') {
+          const ab = await (audioFileRaw as any).arrayBuffer()
+          fileBuffer = Buffer.from(ab)
+        } else if (Buffer.isBuffer(audioFileRaw)) {
+          fileBuffer = audioFileRaw as Buffer
+        } else {
+          // It might be a string (base64 already) or blob
+          fileBuffer = Buffer.from(String(audioFileRaw), 'base64')
+        }
+        audioBase64 = fileBuffer.toString('base64')
+        const sizeMB = (fileBuffer.length / 1024 / 1024).toFixed(1)
+        console.log(`[Ingestion] Form upload: size=${sizeMB}MB`)
+      }
+      body = { source: source as IngestionSource, contactHint, content, audioBase64 } as IngestRequest
+    } else {
+      body = await request.json()
+    }
     const { source, contactHint, content, metadata } = body
 
     // Validate source
@@ -358,6 +391,7 @@ export async function POST(request: NextRequest) {
           ...parsedMetadata,
           originalFrom: parsed.headers.from || parsedMetadata.originalFrom,
           originalTo: parsed.headers.to || parsedMetadata.originalTo,
+          originalCc: parsed.headers.cc || parsedMetadata.originalCc,
           subject: parsed.headers.subject || parsedMetadata.subject,
         }
       }

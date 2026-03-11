@@ -32,12 +32,16 @@ export async function POST(
   try {
     const { id } = await params
 
-    // Optionally accept an edited extraction
+    // Optionally accept an edited extraction and/or provenance annotation
     let editedExtraction: IngestionExtraction | null = null
+    let provenanceAnnotation: { type: string; sourceContactId: string; eventId?: string; sourceInteractionId?: string; notes?: string } | null = null
     try {
       const body = await request.json()
       if (body.extraction) {
         editedExtraction = body.extraction as IngestionExtraction
+      }
+      if (body.provenance) {
+        provenanceAnnotation = body.provenance
       }
     } catch {
       // No body — use stored extraction
@@ -351,6 +355,7 @@ export async function POST(
             email: nc.email,
             phone: nc.phone,
             tier: 3,
+            status: 'mentioned',
             notes: nc.context,
             source: 'ingestion',
             discoveredVia: item.contact?.name || item.contactHint || 'ingestion',
@@ -513,6 +518,51 @@ export async function POST(
         })
         manifest.contactFieldsUpdated = fieldsUpdated
         console.log(`[Inbox] Enriched contact ${item.contact.name}: ${fieldsUpdated.join(', ')}`)
+      }
+    }
+
+    // ── 11. Create Provenance Record ──
+    if (provenanceAnnotation && item.contactId && provenanceAnnotation.sourceContactId) {
+      try {
+        // Upsert: update if this contact pair already has provenance
+        const existing = await prisma.contactProvenance.findUnique({
+          where: {
+            contactId_sourceContactId: {
+              contactId: item.contactId,
+              sourceContactId: provenanceAnnotation.sourceContactId,
+            },
+          },
+        })
+
+        if (existing) {
+          await prisma.contactProvenance.update({
+            where: { id: existing.id },
+            data: {
+              type: provenanceAnnotation.type,
+              notes: provenanceAnnotation.notes || existing.notes,
+              sourceIngestionId: item.id,
+            },
+          })
+          manifest.provenanceId = existing.id
+        } else {
+          const prov = await prisma.contactProvenance.create({
+            data: {
+              contactId: item.contactId,
+              sourceContactId: provenanceAnnotation.sourceContactId,
+              type: provenanceAnnotation.type,
+              eventId: provenanceAnnotation.eventId || null,
+              sourceInteractionId: provenanceAnnotation.sourceInteractionId || manifest.interactionId || null,
+              sourceIngestionId: item.id,
+              notes: provenanceAnnotation.notes || null,
+            },
+          })
+          manifest.provenanceId = prov.id
+        }
+
+        console.log(`[Inbox] Created provenance: ${item.contactId} <- ${provenanceAnnotation.sourceContactId} (${provenanceAnnotation.type})`)
+      } catch (provError) {
+        console.error('[Inbox] Provenance creation failed:', provError)
+        // Non-fatal — don't block the confirm
       }
     }
 

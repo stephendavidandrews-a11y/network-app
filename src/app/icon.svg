@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2563eb"/>
+
+  <!-- Network icon in white, scaled up from lucide's 24x24 to fill the space -->
+  <g transform="translate(256,256) scale(14)" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Connecting lines -->
+    <line x1="-5.09" y1="-7.41" x2="-1.18" y2="-3.5"/>
+    <line x1="5.09" y1="-7.41" x2="1.18" y2="-3.5"/>
+    <line x1="-8.41" y1="2.09" x2="-3.5" y2="1.18"/>
+    <line x1="8.41" y1="2.09" x2="3.5" y2="1.18"/>
+    <line x1="-2.09" y1="8.41" x2="-1.18" y2="3.5"/>
+    <line x1="2.09" y1="8.41" x2="1.18" y2="3.5"/>
+
+    <!-- Central circle -->
+    <circle cx="0" cy="0" r="3.5" fill="white" stroke="none"/>
+
+    <!-- Outer circles -->
+    <circle cx="-6.5" cy="-8.82" r="2.5" fill="white" stroke="none"/>
+    <circle cx="6.5" cy="-8.82" r="2.5" fill="white" stroke="none"/>
+    <circle cx="-9.82" cy="3.5" r="2.5" fill="white" stroke="none"/>
+    <circle cx="9.82" cy="3.5" r="2.5" fill="white" stroke="none"/>
+    <circle cx="-3.5" cy="9.82" r="2.5" fill="white" stroke="none"/>
+    <circle cx="3.5" cy="9.82" r="2.5" fill="white" stroke="none"/>
+  </g>
+</svg>

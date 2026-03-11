@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { daysSinceLastContact, getLastMessageDates } from '@/lib/contact-activity'
 import { ContactsPageContent } from '@/components/contacts/ContactsPageContent'
 
 export default async function ContactsPage({
@@ -11,10 +12,12 @@ export default async function ContactsPage({
   const overdue = searchParams.overdue === 'true'
   const search = searchParams.search ? String(searchParams.search) : undefined
   const sort = searchParams.sort ? String(searchParams.sort) : 'tier'
+  const contactType = searchParams.type ? String(searchParams.type) : undefined
 
   const where: Record<string, unknown> = {}
   if (tier) where.tier = parseInt(tier)
   if (status) where.status = status
+  if (contactType) where.contactType = contactType
 
   let contacts = await prisma.contact.findMany({
     where,
@@ -38,25 +41,41 @@ export default async function ContactsPage({
     )
   }
 
+  const lastMsgDates = await getLastMessageDates(contacts.map(c => c.id))
+
   if (overdue) {
     contacts = contacts.filter(c => {
-      if (!c.lastInteractionDate) return true
-      const days = Math.floor((Date.now() - new Date(c.lastInteractionDate).getTime()) / (1000 * 60 * 60 * 24))
-      return days > c.targetCadenceDays
+      // Skip pathway/org-entry/low-access/deferred contacts
+      const mode = (c as Record<string, unknown>).outreachMode as string | null
+      const access = (c as Record<string, unknown>).accessibility as string | null
+      const timing = (c as Record<string, unknown>).outreachTiming as string | null
+      if (mode === 'pathway' || mode === 'org-entry') return false
+      if (access === 'low') return false
+      if (timing === 'wait_cftc' || timing === 'warm_intro_needed') return false
+
+      const days = daysSinceLastContact(c.lastInteractionDate, lastMsgDates.get(c.id) || null)
+      return days === null || days > c.targetCadenceDays
     })
   }
 
-  const enriched = contacts.map(c => ({
-    ...c,
-    categories: JSON.parse(c.categories || '[]') as string[],
-    tags: JSON.parse(c.tags || '[]') as string[],
-    daysSinceInteraction: c.lastInteractionDate
-      ? Math.floor((Date.now() - new Date(c.lastInteractionDate).getTime()) / (1000 * 60 * 60 * 24))
-      : null,
-    isOverdue: !c.lastInteractionDate || (
-      Math.floor((Date.now() - new Date(c.lastInteractionDate).getTime()) / (1000 * 60 * 60 * 24)) > c.targetCadenceDays
-    ),
-  }))
+  const enriched = contacts.map(c => {
+    const days = daysSinceLastContact(c.lastInteractionDate, lastMsgDates.get(c.id) || null)
+    return {
+      ...c,
+      categories: JSON.parse(c.categories || '[]') as string[],
+      tags: JSON.parse(c.tags || '[]') as string[],
+      daysSinceInteraction: days,
+      isOverdue: (() => {
+        const mode = (c as Record<string, unknown>).outreachMode as string | null
+        const access = (c as Record<string, unknown>).accessibility as string | null
+        const timing = (c as Record<string, unknown>).outreachTiming as string | null
+        if (mode === 'pathway' || mode === 'org-entry') return false
+        if (access === 'low') return false
+        if (timing === 'wait_cftc' || timing === 'warm_intro_needed') return false
+        return days === null || days > c.targetCadenceDays
+      })(),
+    }
+  })
 
   const categoryCounts: Record<string, number> = {}
   enriched.forEach(c => {
@@ -69,7 +88,7 @@ export default async function ContactsPage({
     <ContactsPageContent
       contacts={enriched}
       categoryCounts={categoryCounts}
-      filters={{ tier, status, overdue, search, sort }}
+      filters={{ tier, status, overdue, search, sort, type: contactType }}
     />
   )
 }

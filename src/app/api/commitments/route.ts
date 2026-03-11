@@ -83,3 +83,76 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(enriched)
 }
+
+export async function POST(request: NextRequest) {
+  const body = await request.json()
+
+  if (!body.contactId && body.contactName) {
+    const contact = await prisma.contact.findFirst({
+      where: { name: { contains: body.contactName } },
+      select: { id: true },
+    })
+    if (contact) body.contactId = contact.id
+  }
+
+  if (!body.contactId) {
+    return NextResponse.json(
+      { error: 'contactId is required' },
+      { status: 400 }
+    )
+  }
+
+  // Upsert on sourceSystem + sourceId + sourceClaimId
+  if (body.sourceSystem && body.sourceId && body.sourceClaimId) {
+    const existing = await prisma.commitment.findFirst({
+      where: {
+        sourceSystem: body.sourceSystem,
+        sourceId: body.sourceId,
+        sourceClaimId: body.sourceClaimId,
+      },
+    })
+    if (existing) {
+      const updated = await prisma.commitment.update({
+        where: { id: existing.id },
+        data: {
+          description: body.description || existing.description,
+          dueDate: body.dueDate || body.resolvedDate || existing.dueDate,
+        },
+      })
+      return NextResponse.json(updated, { status: 200 })
+    }
+  }
+
+  // Commitments require an interactionId (FK constraint).
+  // If not provided, find an existing Sauron interaction for this conversation.
+  let interactionId = body.interactionId
+  if (!interactionId && body.sourceSystem === 'sauron' && body.sourceId) {
+    const existingInteraction = await prisma.interaction.findFirst({
+      where: { sourceSystem: 'sauron', sourceId: body.sourceId },
+      select: { id: true },
+    })
+    interactionId = existingInteraction?.id
+  }
+
+  if (!interactionId) {
+    return NextResponse.json(
+      { error: 'interactionId is required (or sourceSystem+sourceId matching an existing interaction)' },
+      { status: 400 }
+    )
+  }
+
+  const commitment = await prisma.commitment.create({
+    data: {
+      interactionId,
+      contactId: body.contactId,
+      description: body.description,
+      dueDate: body.dueDate || body.resolvedDate || null,
+      fulfilled: false,
+      sourceSystem: body.sourceSystem || null,
+      sourceId: body.sourceId || null,
+      sourceClaimId: body.sourceClaimId || null,
+    },
+  })
+
+  return NextResponse.json(commitment, { status: 201 })
+}

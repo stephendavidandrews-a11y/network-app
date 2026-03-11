@@ -7,6 +7,7 @@ import {
   Calendar,
   CheckCircle,
   Clock,
+  Heart,
   Inbox,
   Mail,
   Radio,
@@ -117,6 +118,36 @@ interface DashboardProps {
       daysSince: number | null
       targetCadenceDays: number
     }>
+    roleTransition: {
+      currentRole: string
+      currentRoleLabel: string
+      daysRemaining: number
+      nextRole: string
+      nextRoleLabel: string
+      hawleyWindowCount: number
+    } | null
+    personalStats: {
+      total: number
+      ringCounts: { close: number; regular: number; outer: number; new: number }
+      overdueCount: number
+    }
+    overduePersonal: Array<{
+      id: string
+      name: string
+      ring: string
+      daysSince: number | null
+      cadence: number
+      city: string | null
+      howWeMet: string | null
+    }>
+    upcomingBirthdays: Array<{
+      id: string
+      contactName: string
+      contactId: string
+      description: string
+      eventDate: string | null
+      recurring: boolean
+    }>
   }
 }
 
@@ -132,13 +163,55 @@ export function DashboardContent({ data }: DashboardProps) {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Role Transition Banner */}
+      {data.roleTransition && (
+        <div className={cn(
+          'rounded-lg border p-4',
+          data.roleTransition.daysRemaining > 14 ? 'bg-blue-50 border-blue-200' :
+          data.roleTransition.daysRemaining > 7 ? 'bg-amber-50 border-amber-200' :
+          'bg-red-50 border-red-200'
+        )}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Clock className={cn(
+                'h-5 w-5',
+                data.roleTransition.daysRemaining > 14 ? 'text-blue-600' :
+                data.roleTransition.daysRemaining > 7 ? 'text-amber-600' :
+                'text-red-600'
+              )} />
+              <div>
+                <p className={cn(
+                  'font-semibold text-sm',
+                  data.roleTransition.daysRemaining > 14 ? 'text-blue-800' :
+                  data.roleTransition.daysRemaining > 7 ? 'text-amber-800' :
+                  'text-red-800'
+                )}>
+                  {data.roleTransition.daysRemaining} days remaining in Hawley office
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {data.roleTransition.hawleyWindowCount} contacts flagged as &ldquo;now_hawley&rdquo; timing &middot; CFTC Deputy GC starts {data.roleTransition.daysRemaining <= 0 ? 'soon' : `in ${data.roleTransition.daysRemaining + 3} days`}
+                </p>
+              </div>
+            </div>
+            <Link href="/contacts?timing=now_hawley" className={cn(
+              'text-xs font-medium hover:underline',
+              data.roleTransition.daysRemaining > 14 ? 'text-blue-600' :
+              data.roleTransition.daysRemaining > 7 ? 'text-amber-600' :
+              'text-red-600'
+            )}>
+              View list &rarr;
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{greeting}, Stephen</h1>
           <p className="text-sm text-gray-500 mt-0.5">{dateStr}</p>
         </div>
-        <div className="flex gap-4 text-sm">
+        <div className="flex flex-wrap gap-3 sm:gap-4 text-sm">
           <span className={cn(
             'font-medium',
             data.calendarLoad === 'heavy' ? 'text-red-600' : data.calendarLoad === 'normal' ? 'text-amber-600' : 'text-green-600'
@@ -528,6 +601,114 @@ export function DashboardContent({ data }: DashboardProps) {
           )}
         </section>
       </div>
+
+      {/* Social / Personal Section */}
+      {data.personalStats.total > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Heart className="h-5 w-5 text-pink-500" />
+              Social Circle
+            </h2>
+            <Link href="/social" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+              Dashboard <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          {/* Ring Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-pink-200 bg-pink-50 p-3">
+              <p className="text-xs font-medium text-pink-600 uppercase">Close</p>
+              <p className="text-xl font-bold text-pink-700">{data.personalStats.ringCounts.close}</p>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs font-medium text-blue-600 uppercase">Regular</p>
+              <p className="text-xl font-bold text-blue-700">{data.personalStats.ringCounts.regular}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium text-gray-500 uppercase">Outer</p>
+              <p className="text-xl font-bold text-gray-600">{data.personalStats.ringCounts.outer}</p>
+            </div>
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+              <p className="text-xs font-medium text-green-600 uppercase">New</p>
+              <p className="text-xl font-bold text-green-700">{data.personalStats.ringCounts.new}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Overdue Friends */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700">
+                  Overdue Friends ({data.personalStats.overdueCount})
+                </h3>
+                <Link href="/social/friends?overdue=true" className="text-xs text-blue-600 hover:text-blue-700">
+                  View all
+                </Link>
+              </div>
+              {data.overduePersonal.length === 0 ? (
+                <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">All friends up to date</div>
+              ) : (
+                <div className="rounded-lg border bg-white divide-y">
+                  {data.overduePersonal.slice(0, 5).map((friend) => (
+                    <Link key={friend.id} href={`/contacts/${friend.id}`} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn(
+                          'inline-flex h-5 items-center rounded border px-1.5 text-xs font-medium',
+                          friend.ring === 'close' ? 'bg-pink-50 text-pink-700 border-pink-200' :
+                          friend.ring === 'regular' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          friend.ring === 'outer' ? 'bg-gray-50 text-gray-600 border-gray-200' :
+                          'bg-green-50 text-green-700 border-green-200'
+                        )}>
+                          {friend.ring}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{friend.name}</p>
+                          {friend.city && <p className="text-xs text-gray-500 truncate">{friend.city}</p>}
+                        </div>
+                      </div>
+                      <span className="text-xs text-red-500 font-medium whitespace-nowrap ml-2">
+                        {friend.daysSince !== null ? `${friend.daysSince}d` : 'Never'} / {friend.cadence}d
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Upcoming Birthdays / Life Events */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700">
+                  Upcoming Life Events
+                </h3>
+                <Link href="/social" className="text-xs text-blue-600 hover:text-blue-700">
+                  View all
+                </Link>
+              </div>
+              {data.upcomingBirthdays.length === 0 ? (
+                <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">No upcoming events in next 14 days</div>
+              ) : (
+                <div className="rounded-lg border bg-white divide-y">
+                  {data.upcomingBirthdays.slice(0, 5).map((event) => (
+                    <Link key={event.id} href={`/contacts/${event.contactId}`} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{event.contactName}</p>
+                        <p className="text-xs text-gray-500 truncate">{event.description}</p>
+                      </div>
+                      {event.eventDate && (
+                        <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
+                          {formatDate(event.eventDate)}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

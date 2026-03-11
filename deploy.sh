@@ -4,7 +4,7 @@
 
 set -e
 
-APP_DIR="/opt/network-app"
+APP_DIR="/Users/stephen/Documents/Website/network"
 LOG_DIR="/var/log/network-app"
 BACKUP_DIR="$APP_DIR/backups"
 

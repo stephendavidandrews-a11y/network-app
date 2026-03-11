@@ -175,7 +175,7 @@ export function DraftEditorPage({ outreach, contact, interactions, signals, prev
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center gap-3">
           <Link href="/outreach" className="rounded-md p-1.5 hover:bg-gray-100">
             <ArrowLeft className="h-5 w-5 text-gray-500" />
@@ -187,7 +187,7 @@ export function DraftEditorPage({ outreach, contact, interactions, signals, prev
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {status === 'sent' ? (
             <span className="flex items-center gap-1.5 text-green-600 text-sm font-medium">
               <CheckCircle className="h-4 w-4" /> Sent
@@ -217,9 +217,9 @@ export function DraftEditorPage({ outreach, contact, interactions, signals, prev
         <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
       )}
 
-      <div className="grid grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left: Editor (3/5) */}
-        <div className="col-span-3 space-y-4">
+        <div className="lg:col-span-3 space-y-4">
           {/* Format + Generate */}
           <div className="flex items-center gap-3">
             <select value={format} onChange={(e) => setFormat(e.target.value)}
@@ -272,7 +272,7 @@ export function DraftEditorPage({ outreach, contact, interactions, signals, prev
         </div>
 
         {/* Right: Context panel (2/5) */}
-        <div className="col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           {/* Contact card */}
           <div className="rounded-lg border bg-white p-4">
             <div className="flex items-center gap-2 mb-3">

@@ -25,6 +25,7 @@ interface ExtractionContext {
   metadata?: {
     originalFrom?: string
     originalTo?: string
+    originalCc?: string
     subject?: string
     forwardedFrom?: string
     signature?: {
@@ -247,6 +248,7 @@ ${context.existingCommitments.map(c => `- ${c.description}${c.dueDate ? ` (due: 
     ? `## EMAIL METADATA
 ${context.metadata.originalFrom ? `From: ${context.metadata.originalFrom}` : ''}
 ${context.metadata.originalTo ? `To: ${context.metadata.originalTo}` : ''}
+${context.metadata.originalCc ? `Cc: ${context.metadata.originalCc}` : ''}
 ${context.metadata.subject ? `Subject: ${context.metadata.subject}` : ''}
 ${context.metadata.forwardedFrom ? `Forwarded from: ${context.metadata.forwardedFrom}` : ''}
 ${context.metadata.signature ? `Signature: ${JSON.stringify(context.metadata.signature)}` : ''}`

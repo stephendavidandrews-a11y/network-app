@@ -31,9 +31,11 @@ import {
   Search,
   UserPlus,
   Link2,
+  GitPullRequest,
+  ArrowRight,
 } from 'lucide-react'
 import { TIER_COLORS } from '@/lib/constants'
-import type { IngestionExtraction } from '@/types'
+import type { IngestionExtraction, ProvenanceSuggestion, ProvenanceAnnotation } from '@/types'
 
 interface InboxItem {
   id: string
@@ -52,6 +54,7 @@ interface InboxItem {
   reviewedAt: string | null
   extraction: IngestionExtraction | null
   manifest: Record<string, unknown> | null
+  emailAddresses: string[] | null
 }
 
 interface InboxStats {
@@ -147,10 +150,14 @@ export function InboxPageContent() {
     })
   }
 
-  const handleConfirm = async (id: string) => {
+  const handleConfirm = async (id: string, provenance?: ProvenanceAnnotation | null) => {
     setActionLoading(id)
     try {
-      const res = await fetch(`/api/inbox/${id}/confirm`, { method: 'POST' })
+      const res = await fetch(`/api/inbox/${id}/confirm`, {
+        method: 'POST',
+        headers: provenance ? { 'Content-Type': 'application/json' } : {},
+        body: provenance ? JSON.stringify({ provenance }) : undefined,
+      })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       await fetchItems()
@@ -411,7 +418,7 @@ export function InboxPageContent() {
               item={item}
               expanded={expandedItems.has(item.id)}
               onToggle={() => toggleExpand(item.id)}
-              onConfirm={() => handleConfirm(item.id)}
+              onConfirm={(prov) => handleConfirm(item.id, prov)}
               onDismiss={(reason) => handleDismiss(item.id, reason)}
               onUndo={() => handleUndo(item.id)}
               onAssign={handleAssign}
@@ -436,7 +443,7 @@ interface InboxCardProps {
   item: InboxItem
   expanded: boolean
   onToggle: () => void
-  onConfirm: () => void
+  onConfirm: (provenance?: ProvenanceAnnotation | null) => void
   onDismiss: (reason?: string) => void
   onUndo: () => void
   onAssign: (itemId: string, contactId: string) => Promise<void>
@@ -461,7 +468,28 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, onA
   const [newContactOrg, setNewContactOrg] = useState('')
   const [newContactEmail, setNewContactEmail] = useState('')
   const [assignLoading, setAssignLoading] = useState(false)
+  // Provenance state
+  const [provenanceSuggestions, setProvenanceSuggestions] = useState<ProvenanceSuggestion[]>([])
+  const [provenanceAnnotation, setProvenanceAnnotation] = useState<ProvenanceAnnotation | null>(null)
+  const [provenanceDraft, setProvenanceDraft] = useState<Partial<ProvenanceAnnotation>>({})
+  const [showProvenanceForm, setShowProvenanceForm] = useState(false)
+  const [provenanceLoading, setProvenanceLoading] = useState(false)
+  const [provenanceContactSearch, setProvenanceContactSearch] = useState('')
   const ext = item.extraction
+
+  // Load provenance suggestions when item is expanded
+  const loadProvenanceSuggestions = async () => {
+    if (!item.contactId || !isPending) return
+    try {
+      const res = await fetch(`/api/inbox/${item.id}/provenance-suggestions`)
+      const data = await res.json()
+      if (data.suggestions && data.suggestions.length > 0) {
+        setProvenanceSuggestions(data.suggestions)
+      }
+    } catch {
+      // Silent fail
+    }
+  }
 
   // Load contacts when picker opens
   const loadContacts = async () => {
@@ -600,7 +628,7 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, onA
           : 'border-gray-200 opacity-75'
     }`}>
       {/* Header Row */}
-      <div className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-t-lg" onClick={onToggle}>
+      <div className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-t-lg" onClick={() => { onToggle(); if (!expanded) loadProvenanceSuggestions(); }}>
         <SourceIcon className={`w-4 h-4 flex-shrink-0 ${item.source === 'voice' ? 'text-violet-500' : 'text-gray-400'}`} />
 
         {/* Type Badge */}
@@ -625,10 +653,20 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, onA
                   T{item.contactTier}
                 </span>
               )}
+              {item.emailAddresses && item.emailAddresses.length > 0 && (
+                <span className="text-xs text-gray-400 ml-1">
+                  [{item.emailAddresses.slice(0, 2).join(', ')}]
+                </span>
+              )}
             </span>
           ) : (
             <span className="text-sm text-gray-400 italic flex items-center gap-1.5">
               {item.contactHint || 'Unknown contact'}
+              {item.emailAddresses && item.emailAddresses.length > 0 && (
+                <span className="text-xs text-gray-300">
+                  ({item.emailAddresses.slice(0, 2).join(', ')})
+                </span>
+              )}
               {isPending && (
                 <button
                   onClick={(e) => {
@@ -686,7 +724,14 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, onA
                   autoFocus
                 />
                 <button
-                  onClick={() => { setShowCreateForm(true); setNewContactName(item.contactHint || '') }}
+                  onClick={() => {
+                    setShowCreateForm(true)
+                    setNewContactName(item.contactHint || '')
+                    // Pre-fill email from extracted email addresses
+                    if (item.emailAddresses && item.emailAddresses.length > 0) {
+                      setNewContactEmail(item.emailAddresses[0])
+                    }
+                  }}
                   className="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors flex items-center gap-1"
                 >
                   <UserPlus className="w-3 h-3" />
@@ -751,13 +796,33 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, onA
                   placeholder="Organization"
                   className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <input
-                  type="email"
-                  value={newContactEmail}
-                  onChange={e => setNewContactEmail(e.target.value)}
-                  placeholder="Email"
-                  className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="space-y-1">
+                  <input
+                    type="email"
+                    value={newContactEmail}
+                    onChange={e => setNewContactEmail(e.target.value)}
+                    placeholder="Email"
+                    className="w-full px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {item.emailAddresses && item.emailAddresses.length > 1 && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.emailAddresses.map(email => (
+                        <button
+                          key={email}
+                          type="button"
+                          onClick={() => setNewContactEmail(email)}
+                          className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                            newContactEmail === email
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          {email}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -1055,12 +1120,177 @@ function InboxCard({ item, expanded, onToggle, onConfirm, onDismiss, onUndo, onA
             </div>
           )}
 
+          {/* Provenance Annotation */}
+          {isPending && (
+            <div className="mt-3">
+              {provenanceAnnotation ? (
+                /* State D: Saved annotation */
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
+                  <GitPullRequest className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-sm text-blue-800">
+                    {provenanceAnnotation.type === 'routing' ? 'Routed from' : provenanceAnnotation.type === 'referral' ? 'Referral from' : 'Met at event via'}{' '}
+                    <span className="font-medium">{provenanceAnnotation.sourceContactName || 'contact'}</span>
+                  </span>
+                  {provenanceAnnotation.notes && (
+                    <span className="text-xs text-blue-600 italic ml-1">({provenanceAnnotation.notes})</span>
+                  )}
+                  <button
+                    onClick={() => {
+                      setProvenanceDraft({
+                        type: provenanceAnnotation.type,
+                        sourceContactId: provenanceAnnotation.sourceContactId,
+                        sourceContactName: provenanceAnnotation.sourceContactName,
+                        notes: provenanceAnnotation.notes,
+                      })
+                      setProvenanceContactSearch(provenanceAnnotation.sourceContactName || '')
+                      setProvenanceAnnotation(null)
+                      setShowProvenanceForm(true)
+                    }}
+                    className="ml-auto text-xs text-blue-500 hover:text-blue-700"
+                  >
+                    Edit
+                  </button>
+                </div>
+              ) : provenanceSuggestions.length > 0 && !showProvenanceForm ? (
+                /* State B: Auto-suggestion */
+                <div className="px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <GitPullRequest className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium">Possibly related to outreach</span>
+                  </div>
+                  {provenanceSuggestions.map((sug, i) => (
+                    <div key={i} className="ml-6 text-sm text-gray-600">
+                      <p>
+                        You emailed <span className="font-medium text-gray-800">{sug.sourceContactName}</span>
+                        {sug.sourceOrg && <span className="text-gray-500"> ({sug.sourceOrg})</span>}
+                        {sug.outreachDate && <span className="text-gray-400"> on {new Date(sug.outreachDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                        {sug.outreachSubject && <span className="text-gray-400"> &mdash; &ldquo;{sug.outreachSubject}&rdquo;</span>}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <button
+                          onClick={() => setProvenanceAnnotation({ type: 'routing', sourceContactId: sug.sourceContactId, sourceContactName: sug.sourceContactName })}
+                          className="px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors"
+                        >
+                          Routed from {sug.sourceContactName.split(' ')[1] || sug.sourceContactName.split(' ')[0]}
+                        </button>
+                        <button
+                          onClick={() => setProvenanceAnnotation({ type: 'referral', sourceContactId: sug.sourceContactId, sourceContactName: sug.sourceContactName })}
+                          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
+                        >
+                          Referral from {sug.sourceContactName.split(' ')[1] || sug.sourceContactName.split(' ')[0]}
+                        </button>
+                        <button
+                          onClick={() => setProvenanceSuggestions(prev => prev.filter((_, j) => j !== i))}
+                          className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Not related
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : showProvenanceForm ? (
+                /* State C: Manual annotation form */
+                <div className="px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <GitPullRequest className="w-4 h-4 text-blue-500" />
+                      How did this come about?
+                    </div>
+                    <button onClick={() => { setShowProvenanceForm(false); setProvenanceDraft({}) }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                  <div className="space-y-2 ml-6">
+                    <div className="flex items-center gap-3">
+                      {(['routing', 'referral', 'met_at'] as const).map(t => (
+                        <label key={t} className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`prov-type-${item.id}`}
+                            value={t}
+                            checked={provenanceDraft.type === t}
+                            onChange={() => setProvenanceDraft(prev => ({ ...prev, type: t }))}
+                            className="text-blue-600"
+                          />
+                          {t === 'routing' ? 'Routed from outreach' : t === 'referral' ? 'Referral from' : 'Met at event'}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={provenanceContactSearch}
+                        onChange={e => setProvenanceContactSearch(e.target.value)}
+                        placeholder="Search source contact..."
+                        className="flex-1 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    {provenanceContactSearch.length >= 2 && (
+                      <div className="max-h-32 overflow-y-auto rounded-md border border-gray-200 bg-white divide-y divide-gray-100">
+                        {allContacts
+                          .filter(c => c.name.toLowerCase().includes(provenanceContactSearch.toLowerCase()) || (c.organization && c.organization.toLowerCase().includes(provenanceContactSearch.toLowerCase())))
+                          .slice(0, 5)
+                          .map(c => (
+                            <button
+                              key={c.id}
+                              onClick={() => {
+                                setProvenanceDraft(prev => ({ ...prev, sourceContactId: c.id, sourceContactName: c.name }))
+                                setProvenanceContactSearch(c.name)
+                              }}
+                              className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 transition-colors"
+                            >
+                              <span className="font-medium text-gray-900">{c.name}</span>
+                              {c.organization && <span className="text-gray-400 ml-1">({c.organization})</span>}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      value={provenanceDraft.notes || ''}
+                      onChange={e => setProvenanceDraft(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Notes (optional)"
+                      className="w-full px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => {
+                        if (provenanceDraft.type && provenanceDraft.sourceContactId) {
+                          setProvenanceAnnotation({
+                            type: provenanceDraft.type,
+                            sourceContactId: provenanceDraft.sourceContactId,
+                            sourceContactName: provenanceDraft.sourceContactName,
+                            notes: provenanceDraft.notes,
+                          })
+                          setShowProvenanceForm(false)
+                          setProvenanceDraft({})
+                        }
+                      }}
+                      disabled={!provenanceDraft.type || !provenanceDraft.sourceContactId}
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* State A: Collapsed link */
+                <button
+                  onClick={() => { setShowProvenanceForm(true); loadContacts() }}
+                  className="w-full px-3 py-2 rounded-lg border border-dashed border-gray-300 text-sm text-gray-400 hover:text-gray-600 hover:border-gray-400 transition-colors text-left flex items-center gap-2"
+                >
+                  <GitPullRequest className="w-3.5 h-3.5" />
+                  Link to prior outreach...
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
             {isPending && (
               <>
                 <button
-                  onClick={onConfirm}
+                  onClick={() => onConfirm(provenanceAnnotation)}
                   disabled={isLoading}
                   className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
                 >

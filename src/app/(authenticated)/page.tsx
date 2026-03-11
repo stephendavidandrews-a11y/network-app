@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { daysSinceLastContact, getLastMessageDates } from '@/lib/contact-activity'
 import { DashboardContent } from '@/components/dashboard/DashboardContent'
 import { classifyCalendarLoad } from '@/lib/calendar'
 import type { CalendarMeeting, CalendarLoad, MeetingPrepRecord, CommitmentUrgency } from '@/types'
@@ -10,12 +11,19 @@ async function getDashboardData() {
     orderBy: { lastInteractionDate: 'asc' },
   })
 
+  const dashLastMsgDates = await getLastMessageDates(allContacts.map(c => c.id))
+
   const overdueContacts = allContacts.filter((c) => {
-    if (!c.lastInteractionDate) return true
-    const daysSince = Math.floor(
-      (Date.now() - new Date(c.lastInteractionDate).getTime()) / (1000 * 60 * 60 * 24)
-    )
-    return daysSince > c.targetCadenceDays
+    // Skip pathway/org-entry contacts and low-accessibility contacts — they have separate gating
+    const mode = (c as Record<string, unknown>).outreachMode as string | null
+    const access = (c as Record<string, unknown>).accessibility as string | null
+    const timing = (c as Record<string, unknown>).outreachTiming as string | null
+    if (mode === 'pathway' || mode === 'org-entry') return false
+    if (access === 'low') return false
+    if (timing === 'wait_cftc' || timing === 'warm_intro_needed') return false
+
+    const days = daysSinceLastContact(c.lastInteractionDate, dashLastMsgDates.get(c.id) || null)
+    return days === null || days > c.targetCadenceDays
   })
 
   const recentSignals = await prisma.intelligenceSignal.findMany({
@@ -157,6 +165,63 @@ async function getDashboardData() {
     },
   })
 
+  // Personal contacts data for social section
+  const personalContacts = allContacts.filter(c => {
+    const ct = (c as Record<string, unknown>).contactType as string | null
+    return ct === 'personal' || ct === 'both'
+  })
+
+  const overduePersonal = personalContacts.filter(c => {
+    const cadence = (c as Record<string, unknown>).personalCadenceDays as number | null || 21
+    const days = daysSinceLastContact(c.lastInteractionDate, dashLastMsgDates.get(c.id) || null)
+    return days === null || days > cadence
+  }).map(c => ({
+    id: c.id,
+    name: c.name,
+    ring: ((c as Record<string, unknown>).personalRing as string) || 'new',
+    daysSince: daysSinceLastContact(c.lastInteractionDate, dashLastMsgDates.get(c.id) || null),
+    cadence: (c as Record<string, unknown>).personalCadenceDays as number || 21,
+    city: (c as Record<string, unknown>).city as string | null,
+    howWeMet: (c as Record<string, unknown>).howWeMet as string | null,
+  })).sort((a, b) => (b.daysSince || 999) - (a.daysSince || 999)).slice(0, 10)
+
+  const ringCounts = { close: 0, regular: 0, outer: 0, new: 0 }
+  personalContacts.forEach(c => {
+    const ring = ((c as Record<string, unknown>).personalRing as string) || 'new'
+    if (ring in ringCounts) ringCounts[ring as keyof typeof ringCounts]++
+  })
+
+  // Upcoming life events (birthdays, etc.) for personal contacts
+  const lifeEvents = await prisma.lifeEvent.findMany({
+    where: { eventDate: { not: null } },
+    include: { contact: { select: { id: true, name: true, contactType: true } } },
+  })
+
+  const upcomingBirthdays = lifeEvents.filter(e => {
+    if (!e.contact || !['personal', 'both'].includes(e.contact.contactType)) return false
+    if (!e.eventDate) return false
+    const eventType = (e as Record<string, unknown>).eventType as string | null
+    if (eventType && eventType !== 'birthday' && eventType !== 'custom') return false
+    if (e.recurring) {
+      const eventMonth = parseInt(e.eventDate.slice(5, 7))
+      const eventDay = parseInt(e.eventDate.slice(8, 10))
+      const now = new Date()
+      for (let d = 0; d < 14; d++) {
+        const check = new Date(now.getTime() + d * 86400000)
+        if (check.getMonth() + 1 === eventMonth && check.getDate() === eventDay) return true
+      }
+      return false
+    }
+    return e.eventDate >= today && e.eventDate <= new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
+  }).map(e => ({
+    id: e.id,
+    contactName: e.contact?.name || '',
+    contactId: e.contact?.id || '',
+    description: e.description,
+    eventDate: e.eventDate,
+    recurring: e.recurring,
+  }))
+
   const totalContacts = allContacts.length
   const overdueTier1 = overdueContacts.filter(c => c.tier === 1).length
   const overdueTier2 = overdueContacts.filter(c => c.tier === 2).length
@@ -215,10 +280,16 @@ async function getDashboardData() {
       .slice(0, 15)
       .map((c) => ({
         ...c,
-        daysSince: c.lastInteractionDate
-          ? Math.floor((Date.now() - new Date(c.lastInteractionDate).getTime()) / (1000 * 60 * 60 * 24))
-          : null,
+        daysSince: daysSinceLastContact(c.lastInteractionDate, dashLastMsgDates.get(c.id) || null),
       })),
+    // Personal / Social section
+    personalStats: {
+      total: personalContacts.length,
+      ringCounts,
+      overdueCount: overduePersonal.length,
+    },
+    overduePersonal,
+    upcomingBirthdays,
   }
 }
 

@@ -21,7 +21,7 @@ export async function runCadenceCheck(prisma: PrismaClient): Promise<{
   // Find contacts that are overdue based on their tier cadence
   const contacts = await prisma.contact.findMany({
     where: {
-      status: { notIn: ['dormant'] },
+      status: { notIn: ['dormant', 'mentioned'] },
       tier: { in: [1, 2, 3] },
     },
     include: {

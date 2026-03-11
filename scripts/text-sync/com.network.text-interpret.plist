@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.network.text-interpret</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/stephen/Documents/Website/network/scripts/text-sync/venv/bin/python3</string>
+        <string>/Users/stephen/Documents/Website/network/scripts/text-sync/sync_interpret.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/stephen/Documents/Website/network/scripts/text-sync</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/stephen/Documents/Website/network/scripts/text-sync/interpret_stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/stephen/Documents/Website/network/scripts/text-sync/interpret_stderr.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

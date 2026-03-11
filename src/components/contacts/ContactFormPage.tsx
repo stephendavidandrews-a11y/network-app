@@ -20,6 +20,7 @@ interface ContactData {
   tags: string[]
   targetCadenceDays: number
   status: string
+  contactType: string
   introductionPathway: string | null
   connectionToHawleyOrbit: string | null
   whyTheyMatter: string | null
@@ -46,6 +47,7 @@ export function ContactFormPage({ contact }: { contact?: ContactData }) {
     tags: contact?.tags || [],
     targetCadenceDays: contact?.targetCadenceDays || 60,
     status: contact?.status || 'target',
+    contactType: contact?.contactType || 'professional',
     introductionPathway: contact?.introductionPathway || '',
     connectionToHawleyOrbit: contact?.connectionToHawleyOrbit || '',
     whyTheyMatter: contact?.whyTheyMatter || '',
@@ -190,6 +192,24 @@ export function ContactFormPage({ contact }: { contact?: ContactData }) {
         {/* Classification */}
         <div className="rounded-lg border bg-white p-6 space-y-4">
           <h2 className="text-sm font-semibold text-gray-900">Classification</h2>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-2">Contact Type</label>
+            <div className="flex gap-2">
+              {[
+                { value: 'professional', label: 'Professional' },
+                { value: 'personal', label: 'Friend' },
+                { value: 'both', label: 'Both' },
+              ].map(t => (
+                <button key={t.value} type="button" onClick={() => updateField('contactType', t.value)}
+                  className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                    form.contactType === t.value ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 hover:bg-gray-50'
+                  }`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-2">Tier</label>

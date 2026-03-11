@@ -7,6 +7,11 @@ import { runDbBackup } from '@/lib/jobs/db-backup'
 import { runCalendarSync } from '@/lib/jobs/calendar-sync'
 import { runMeetingPrepGenerate } from '@/lib/jobs/meeting-prep-generate'
 import { runEmailPoll } from '@/lib/jobs/email-poll'
+import { runPodcastMonitor } from '@/lib/visibility/podcast-monitor'
+import { runEventDiscovery, runEventClassification, runContentTriage, runNeedsFetchRetriage } from '@/lib/jobs/event-discovery'
+import { fetchIntelContent } from '@/lib/visibility/content-fetcher'
+import { extractIntelContent } from '@/lib/visibility/content-extractor'
+import { runPathwayScorer } from '@/lib/jobs/pathway-scorer'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
@@ -38,6 +43,38 @@ export async function POST(request: NextRequest) {
         const result = await runEmailPoll()
         return NextResponse.json({ job, result })
       }
+          case 'podcast_monitor': {
+      const result = await runPodcastMonitor(prisma)
+      return NextResponse.json({ job, result })
+    }
+    case 'event_discovery': {
+      const result = await runEventDiscovery(prisma)
+      return NextResponse.json({ job, result })
+    }
+    case 'event_classification': {
+      const result = await runEventClassification(prisma)
+      return NextResponse.json({ job, result })
+    }
+    case 'content_triage': {
+      const result = await runContentTriage(prisma)
+      return NextResponse.json({ job, result })
+    }
+    case 'content_ingestion': {
+      const result = await fetchIntelContent(prisma)
+      return NextResponse.json({ job, result })
+    }
+    case 'content_extraction': {
+      const result = await extractIntelContent(prisma)
+      return NextResponse.json({ job, result })
+    }
+    case 'needs_fetch_retriage': {
+      const result = await runNeedsFetchRetriage(prisma)
+      return NextResponse.json({ job, result })
+    }
+    case 'pathway_scorer': {
+      const result = await runPathwayScorer(prisma)
+      return NextResponse.json({ job, result })
+    }
       case 'all': {
         const calendar = await runCalendarSync(prisma)
         const scores = await runScoreUpdate(prisma)
