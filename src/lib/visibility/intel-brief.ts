@@ -1,11 +1,9 @@
 import { PrismaClient } from '@prisma/client'
-import Anthropic from '@anthropic-ai/sdk'
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 
 export async function generateIntelBrief(
   prisma: PrismaClient
 ): Promise<{ weekStart: string; weekEnd: string; extractionCount: number }> {
-  const anthropic = new Anthropic()
-
   const now = new Date()
   const weekEnd = now.toISOString().split('T')[0]
   const weekStartDate = new Date(now)
@@ -75,7 +73,7 @@ export async function generateIntelBrief(
   }
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await budgetedCreate({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
       messages: [{
@@ -112,7 +110,7 @@ Podcast episodes this week relevant to the strategist's focus areas. Include sho
 
 Write in concise, executive-summary style. Be specific about names, dates, and implications.`
       }],
-    })
+    }, 'intel-brief')
 
     const briefContent = response.content[0].type === 'text' ? response.content[0].text : ''
 

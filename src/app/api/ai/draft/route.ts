@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import Anthropic from '@anthropic-ai/sdk'
 import { shouldGenerateOutreach, getCurrentRole, getBestPretext } from '@/lib/outreach/pretext-selector'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const { contactId, triggerType, triggerDescription, signalContext, format } = body
@@ -177,12 +172,12 @@ ${contact.outreachItems.length > 0
 Draft the ${draftFormat} now.`
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await budgetedCreate({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    })
+    }, 'ai-draft')
 
     const responseText = message.content
       .filter(block => block.type === 'text')

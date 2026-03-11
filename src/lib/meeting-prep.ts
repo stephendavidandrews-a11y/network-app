@@ -1,10 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 export interface PrepContext {
   contact: {
     id: string
@@ -237,12 +232,12 @@ ${context.sharedEvents.length > 0
 
 Generate the meeting prep brief now.`
 
-  const message = await anthropic.messages.create({
+  const message = await budgetedCreate({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1500,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
-  })
+  }, 'meeting-prep')
 
   return message.content
     .filter(block => block.type === 'text')

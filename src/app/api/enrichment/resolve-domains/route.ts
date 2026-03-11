@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -50,7 +45,7 @@ export async function POST(request: NextRequest) {
       const batch = organizations.slice(i, i + 25)
       const numberedList = batch.map((org, idx) => `${idx + 1}. ${org}`).join('\n')
 
-      const message = await anthropic.messages.create({
+      const message = await budgetedCreate({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         messages: [
@@ -70,7 +65,7 @@ Organizations:
 ${numberedList}`,
           },
         ],
-      })
+      }, 'enrichment-domains')
 
       const responseText =
         message.content[0].type === 'text' ? message.content[0].text : ''

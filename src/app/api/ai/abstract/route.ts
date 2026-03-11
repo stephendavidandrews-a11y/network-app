@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const { eventId, topics, eventName, eventType } = body
@@ -25,7 +20,7 @@ export async function POST(request: NextRequest) {
   const eventInfo = eventName || 'Conference'
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await budgetedCreate({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       messages: [{
@@ -51,7 +46,7 @@ TITLE: [talk title]
 ---
 [abstract text]`,
       }],
-    })
+    }, 'ai-abstract')
 
     const responseText = message.content
       .filter(block => block.type === 'text')

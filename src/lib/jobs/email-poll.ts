@@ -1,7 +1,7 @@
 /**
  * Email Polling Job
  *
- * Connects to notes@stephenandrews.org via IMAP,
+ * Connects to email@stephenandrews.org via IMAP,
  * reads unread emails, parses forwarding headers,
  * and sends each to the ingestion pipeline.
  *
@@ -17,7 +17,7 @@ import { processIngestion } from '@/lib/ingestion/process'
  * This handles the case where the user CCs notes@ on an outgoing email.
  */
 const MY_EMAIL_ADDRESSES = [
-  'notes@stephenandrews.org',
+  'email@stephenandrews.org',
   'stephen_andrews@hawley.senate.gov',
   'stephen.david.andrews@gmail.com',
   'stephen@stephenandrews.org',
@@ -330,6 +330,16 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
             continue
           }
 
+          // Guard: truncate oversized content to prevent 200K+ token API calls
+          const MAX_EMAIL_CHARS = 100_000 // ~25K tokens — well within API limits
+          if (textContent.length > MAX_EMAIL_CHARS) {
+            console.warn(`[EmailPoll] UID ${uid} content is ${textContent.length} chars — truncating to ${MAX_EMAIL_CHARS}`)
+            textContent = textContent.slice(0, MAX_EMAIL_CHARS) +
+              `
+
+[... Truncated: original was ${textContent.length.toLocaleString()} characters ...]`
+          }
+
           // Parse the email content
           const parsed = parseEmail(textContent)
 
@@ -401,6 +411,15 @@ export async function runEmailPoll(): Promise<EmailPollResult> {
             from: env?.from?.[0]?.address || 'unknown',
             result: `error: ${err instanceof Error ? err.message : String(err)}`,
           })
+          // CRITICAL: Mark as seen even on error to prevent infinite retry loop.
+          // Without this, failed emails get re-processed every 5 minutes forever,
+          // burning API budget on the same oversized/broken messages.
+          try {
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true })
+            console.log(`[EmailPoll] UID ${uid} marked as seen despite error (preventing retry)`)
+          } catch (markErr) {
+            console.error(`[EmailPoll] Failed to mark UID ${uid} as seen:`, markErr)
+          }
         }
       }
     } finally {

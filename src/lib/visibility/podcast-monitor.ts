@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
-import Anthropic from '@anthropic-ai/sdk'
 import { execSync } from 'child_process'
 import Parser from 'rss-parser'
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 
 const MAX_EPISODES_PER_FEED = 20
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
@@ -290,11 +290,11 @@ Set isPitchWindow: true if topicRelevanceScore >= 6.
 
 Only return the JSON object.`
 
-      const response = await client.messages.create({
+      const response = await budgetedCreate({
         model: CLAUDE_MODEL,
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
-      })
+      }, 'podcast-monitor')
 
       const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
@@ -457,8 +457,6 @@ export async function runPodcastMonitor(prisma: PrismaClient) {
 
   const contactContext = await buildContactContext(prisma)
   const allContacts = await prisma.contact.findMany({ select: { id: true, name: true } })
-  const client = new Anthropic()
-
   const podcastMap = new Map(podcasts.map(p => [p.id, p]))
 
   for (const podcast of podcasts) {
@@ -490,8 +488,6 @@ export async function runSinglePodcastMonitor(prisma: PrismaClient, podcastId: s
 
   const contactContext = await buildContactContext(prisma)
   const allContacts = await prisma.contact.findMany({ select: { id: true, name: true } })
-  const client = new Anthropic()
-
   await monitorOnePodcast(prisma, podcast, contactContext, allContacts, client, stats)
   return stats
 }

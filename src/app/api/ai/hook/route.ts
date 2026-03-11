@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const { signalType, signalTitle, signalDescription, contactName, contactOrg, contactContext } = body
@@ -14,7 +9,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await budgetedCreate({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 256,
       messages: [{
@@ -28,7 +23,7 @@ ${contactContext ? `Context about contact: ${contactContext}` : ''}
 
 The hook should reference the signal naturally and create a reason for outreach. Be specific, not generic. Return ONLY the hook text, nothing else.`,
       }],
-    })
+    }, 'ai-hook')
 
     const hook = message.content
       .filter(block => block.type === 'text')

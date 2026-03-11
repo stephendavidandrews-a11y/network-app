@@ -6,13 +6,8 @@
  * extraction engine for the ingestion system.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import type { IngestionExtraction, IngestionSource, AudioFeatures } from '@/types'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 interface ExtractionContext {
   source: IngestionSource
   contactName?: string
@@ -279,16 +274,16 @@ ${metadataSection}
 ${audioSection}
 
 ## CONTENT (${sourceLabel(context.source)})
-${content}
+${content.length > 100_000 ? content.slice(0, 80_000) + '\n\n[... ' + (content.length - 80_000).toLocaleString() + ' chars truncated ...]' : content}
 
 Extract the full structured data now. Be thorough — capture everything of value.${context.audioFeatures ? ' Include observations about tone, energy, and conversation dynamics based on the audio analysis in your summary and relationshipNotes.' : ''}`
 
-  const message = await anthropic.messages.create({
+  const message = await budgetedCreate({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
-  })
+  }, 'ingestion-extract')
 
   const responseText = message.content
     .filter(block => block.type === 'text')

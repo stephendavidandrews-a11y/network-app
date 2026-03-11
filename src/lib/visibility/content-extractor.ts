@@ -1,7 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { PrismaClient } from '@prisma/client'
-
-const client = new Anthropic()
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 const MAX_TEXT_LENGTH = 30000
 const MAX_ITEMS_PER_RUN = 50
 
@@ -269,11 +267,11 @@ export async function extractIntelContent(prisma: PrismaClient) {
       const textForClaude = text.length > MAX_TEXT_LENGTH ? text.substring(0, MAX_TEXT_LENGTH) + '\n\n[Text truncated]' : text
       const prompt = buildPrompt(item, textForClaude, contactContext, isThin)
 
-      const response = await client.messages.create({
+      const response = await budgetedCreate({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }],
-      })
+      }, 'content-extractor')
 
       const responseText = response.content[0].type === 'text' ? response.content[0].text : ''
 

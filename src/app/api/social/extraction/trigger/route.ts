@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import Anthropic from '@anthropic-ai/sdk'
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 
 function parseJson(value: string | null, fallback: unknown = null) {
   if (!value) return fallback
@@ -64,11 +64,8 @@ export async function POST(request: NextRequest) {
       const content = m.content && m.content.length > 500 ? m.content.slice(0, 500) + '...' : m.content
       return `[${ts}] ${prefix}: ${content}`
     }).join('\n')
-
-    const client = new Anthropic()
-
     if (type === 'factual') {
-      const response = await client.messages.create({
+      const response = await budgetedCreate({
         model: FACTUAL_MODEL,
         max_tokens: 4000,
         system: FACTUAL_SYSTEM_PROMPT,
@@ -76,7 +73,7 @@ export async function POST(request: NextRequest) {
           role: 'user',
           content: `Contact: ${contact.name}\nRing: ${contact.personalRing || 'unknown'}\nContact type: ${contact.contactType}\nTotal messages: ${truncatedMessages.length}\n\n--- MESSAGE HISTORY ---\n${truncatedFormatted}`,
         }],
-      })
+      }, 'social-extraction')
 
       const raw = response.content[0].type === 'text' ? response.content[0].text : ''
       const result = parseJsonResponse(raw)
@@ -134,7 +131,7 @@ export async function POST(request: NextRequest) {
         .replace('{contact_name}', contact.name)
         .replace('{factual_json}', JSON.stringify(factualData, null, 2))
 
-      const response = await client.messages.create({
+      const response = await budgetedCreate({
         model: INTERPRETIVE_MODEL,
         max_tokens: 4000,
         system: systemPrompt,
@@ -142,7 +139,7 @@ export async function POST(request: NextRequest) {
           role: 'user',
           content: `Contact: ${contact.name}\nRing: ${contact.personalRing || 'unknown'}\nContact type: ${contact.contactType}\nTotal messages: ${truncatedMessages.length}\n\n--- MESSAGE HISTORY ---\n${truncatedFormatted}`,
         }],
-      })
+      }, 'social-extraction')
 
       const raw = response.content[0].type === 'text' ? response.content[0].text : ''
       const result = parseJsonResponse(raw)

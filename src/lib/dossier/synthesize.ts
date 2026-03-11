@@ -10,13 +10,8 @@
  * - full: Regenerates entire dossier from all historical data
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/db'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 interface SynthesizeResult {
   dossierId: string
   version: number
@@ -381,12 +376,12 @@ ${networkSection}
 Generate the comprehensive dossier now. Be thorough — this is Stephen's primary reference document for this contact.`
   }
 
-  const message = await anthropic.messages.create({
+  const message = await budgetedCreate({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
-  })
+  }, 'dossier-synthesize')
 
   const dossierContent = message.content
     .filter(block => block.type === 'text')

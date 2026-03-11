@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import Anthropic from '@anthropic-ai/sdk'
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 
 // Tier config — determines auto-pass and scoring thresholds
 const TIER_CONFIG: Record<string, { tier: number; threshold: number }> = {
@@ -105,7 +105,6 @@ async function buildCalibrationExamples(prisma: PrismaClient): Promise<string> {
 export async function triageIntelContent(
   prisma: PrismaClient
 ): Promise<{ triaged: number; filtered: number; stale: number; deduped: number; needsFetch: number; errors: number }> {
-  const anthropic = new Anthropic()
   let triaged = 0
   let filtered = 0
   let stale = 0
@@ -247,7 +246,7 @@ export async function triageIntelContent(
     )).join('\n')
 
     try {
-      const response = await anthropic.messages.create({
+      const response = await budgetedCreate({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
         messages: [{
@@ -300,7 +299,7 @@ Return JSON array:
 
 Only return the JSON array.`,
         }],
-      })
+      }, 'content-triage')
 
       const text = response.content[0].type === 'text' ? response.content[0].text : ''
       const jsonMatch = text.match(/\[[\s\S]*\]/)
@@ -363,7 +362,6 @@ Only return the JSON array.`,
 export async function retriageNeedsFetch(
   prisma: PrismaClient
 ): Promise<{ triaged: number; filtered: number; errors: number }> {
-  const anthropic = new Anthropic()
   let triaged = 0
   let filtered = 0
   let errors = 0
@@ -430,7 +428,7 @@ export async function retriageNeedsFetch(
 
       const config = TIER_CONFIG[item.source.category] || { tier: 4, threshold: 6 }
 
-      const triageResponse = await anthropic.messages.create({
+      const triageResponse = await budgetedCreate({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 500,
         messages: [{
@@ -445,7 +443,7 @@ ${bodyText}
 Return JSON: {"score": 7, "reason": "brief reason"}
 Only return the JSON.`,
         }],
-      })
+      }, 'content-triage')
 
       const triageText = triageResponse.content[0].type === 'text' ? triageResponse.content[0].text : ''
       const jsonMatch = triageText.match(/\{[\s\S]*\}/)

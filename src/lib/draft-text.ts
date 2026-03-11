@@ -8,13 +8,8 @@
  *   3. Global fallback profile
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from './db'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 export interface DraftTextRequest {
   contactId: string
   planType: string  // happy_hour, golf, dinner, party, reachout, birthday, followup
@@ -285,12 +280,12 @@ CRITICAL RULES:
   userPrompt += '\n\nWrite the text message now.'
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await budgetedCreate({
       model: 'claude-opus-4-20250514',
       max_tokens: 300,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    })
+    }, 'draft-text')
 
     const draftText = message.content
       .filter(block => block.type === 'text')

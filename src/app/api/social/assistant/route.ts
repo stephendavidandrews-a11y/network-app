@@ -1,16 +1,11 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/db'
 import { daysSinceLastContact, getLastMessageDates, getCommStatsMap } from '@/lib/contact-activity'
 import { generatePlan } from '@/lib/planning-engine'
 import { generateDraftText } from '@/lib/draft-text'
 import { sendIMessage } from '@/lib/imessage'
 import { generateDailyNudges } from '@/lib/nudge-engine'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 // ─── Tool Definitions ─────────────────────────────────
 
 const tools: Anthropic.Tool[] = [
@@ -687,13 +682,13 @@ export async function POST(request: NextRequest) {
           while (iterations < MAX_ITERATIONS) {
             iterations++
 
-            const response = await anthropic.messages.create({
+            const response = await budgetedCreate({
               model: 'claude-sonnet-4-20250514',
               max_tokens: 2048,
               system: buildSystemPrompt(),
               tools,
               messages: currentMessages,
-            })
+            }, 'social-assistant')
 
             // Check if there are tool calls
             const toolUseBlocks = response.content.filter(

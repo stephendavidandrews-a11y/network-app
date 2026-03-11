@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import Anthropic from '@anthropic-ai/sdk'
 import type { DebriefExtraction, DebriefCommitment, DebriefCalendarEvent } from '@/types'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-})
-
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const { transcript, contactId, meetingContext } = body
@@ -226,12 +221,12 @@ ${transcript}
 Extract the structured information now. Remember to resolve any temporal references ("by Friday", "next week", "before the conference") to specific dates.`
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await budgetedCreate({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 3000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    })
+    }, 'ai-debrief')
 
     const responseText = message.content
       .filter(block => block.type === 'text')

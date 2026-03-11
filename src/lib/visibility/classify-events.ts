@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import Anthropic from '@anthropic-ai/sdk'
+import { budgetedCreate, truncateForAPI } from '@/lib/api-budget'
 
 const EXPERTISE_KEYWORDS = [
   'CFTC', 'commodity futures', 'derivatives', 'Loper Bright', 'Chevron deference',
@@ -14,7 +14,6 @@ export async function classifyDiscoveredEvents(
   prisma: PrismaClient,
   batchSize: number = 10
 ): Promise<{ classified: number; dismissed: number; errors: number }> {
-  const anthropic = new Anthropic()
   let classified = 0
   let dismissed = 0
   let errors = 0
@@ -37,7 +36,7 @@ export async function classifyDiscoveredEvents(
   )).join('\n\n---\n\n')
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await budgetedCreate({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
       messages: [{
@@ -89,7 +88,7 @@ Return JSON array:
 
 Only return the JSON array, no other text.`
       }],
-    })
+    }, 'classify-events')
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
     const jsonMatch = text.match(/\[[\s\S]*\]/)
