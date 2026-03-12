@@ -43,7 +43,7 @@ next-env.d.ts
 /backups/
 
 # prisma
-/prisma/migrations/*/migration.sql
+
 /prisma/*.backup
 
 # python
