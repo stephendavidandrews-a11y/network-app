@@ -197,7 +197,7 @@ async function handleToolCall(name: string, input: Record<string, unknown>): Pro
 
       // Filter by interest
       if (interest) {
-        const interestContacts = await prisma.contactInterest.findMany({
+        const interestContacts = await prisma.personalInterest.findMany({
           where: { interest: { contains: interest, mode: 'insensitive' } },
           select: { contactId: true },
         })

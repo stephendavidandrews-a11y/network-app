@@ -54,6 +54,7 @@ model Contact {
   dossierCurrentVersion Int?    @map("dossier_current_version")
 
   interactions           Interaction[]
+  interactionParticipants InteractionParticipant[]
   signals                IntelligenceSignal[]
   outreachItems          OutreachQueue[]
   relationshipsAsA       ContactRelationship[]   @relation("ContactA")
@@ -89,7 +90,7 @@ model Contact {
   podcastsAsHost         Podcast[]               @relation("PodcastHost")
   podcastsAsProducer     Podcast[]               @relation("PodcastProducer")
   podcastOutreach        PodcastOutreach[]
-  contactInterests       ContactInterest[]
+  contactInterests    // DEPRECATED — see ContactInterest model       ContactInterest[]
   affiliations           ContactAffiliation[]
 
   @@index([tier])
@@ -128,10 +129,31 @@ model Interaction {
   contact           Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
   ingestionItem     IngestionItem? @relation(fields: [sourceIngestionId], references: [id])
   commitmentRecords Commitment[]
+  participants      InteractionParticipant[]
 
   @@index([contactId, date(sort: Desc)])
   @@index([sourceSystem, sourceId])
   @@map("interactions")
+}
+
+model InteractionParticipant {
+  id            String @id @default(uuid())
+  interactionId String @map("interaction_id")
+  contactId     String @map("contact_id")
+  role          String @default("participant") // participant, organizer, mentioned
+  speakerLabel  String? @map("speaker_label")  // SPEAKER_00, SPEAKER_01, etc.
+
+  sourceSystem  String? @map("source_system")
+  sourceId      String? @map("source_id")
+  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  interaction   Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  contact       Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([interactionId, contactId])
+  @@index([interactionId])
+  @@index([contactId])
+  @@map("interaction_participants")
 }
 
 model IntelligenceSignal {
@@ -1160,6 +1182,8 @@ model TriageFeedback {
   @@map("triage_feedback")
 }
 
+// DEPRECATED (Step J): Zero data, no API route, no provenance fields.
+// Use PersonalInterest instead (personal_interests table, /api/personal/interests).
 model ContactInterest {
   id           String  @id @default(uuid())
   contactId    String  @map("contact_id")
