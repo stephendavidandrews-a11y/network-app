@@ -1288,6 +1288,8 @@ model OrganizationSignal {
   sourceId        String? @map("source_id")
   sourceClaimId   String? @map("source_claim_id")
   resolutionSource String? @map("resolution_source")
+  relatedOrg       String? @map("related_org")
+  relationshipType String? @map("relationship_type")
   createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
   updatedAt       String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
