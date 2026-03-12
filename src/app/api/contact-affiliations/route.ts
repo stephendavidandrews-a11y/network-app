@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-
-function normalizeOrgName(name: string): string {
-  return name.toLowerCase().trim()
-    .replace(/[.,]/g, "")
-    .replace(/\s+/g, " ")
-}
+import { resolveOrganization } from "@/lib/orgResolver"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -36,15 +31,17 @@ export async function POST(request: NextRequest) {
     }
 
     let orgId = body.organizationId
+    let resolutionSource: string | null = null
     if (!orgId && body.organizationName) {
-      const normalizedName = normalizeOrgName(body.organizationName)
-      let org = await prisma.organization.findUnique({ where: { normalizedName } })
-      if (!org) {
-        org = await prisma.organization.create({
-          data: { name: body.organizationName.trim(), normalizedName },
-        })
+      const result = await resolveOrganization(prisma, body.organizationName)
+      if (!result.organization) {
+        return NextResponse.json(
+          { error: "Organization not resolved", resolutionSource: result.resolutionSource },
+          { status: 422 }
+        )
       }
-      orgId = org.id
+      orgId = result.organization.id
+      resolutionSource = result.resolutionSource
     }
     if (!orgId) {
       return NextResponse.json({ error: "organizationId or organizationName required" }, { status: 400 })
@@ -92,6 +89,7 @@ export async function POST(request: NextRequest) {
         sourceSystem: body.sourceSystem || null,
         sourceId: body.sourceId || null,
         sourceClaimId: body.sourceClaimId || null,
+        resolutionSource,
       },
     })
     return NextResponse.json(affiliation, { status: 201 })

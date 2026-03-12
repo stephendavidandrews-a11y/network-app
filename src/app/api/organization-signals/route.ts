@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-
-function normalizeOrgName(name: string): string {
-  return name.toLowerCase().trim()
-    .replace(/[.,]/g, "")
-    .replace(/\s+/g, " ")
-}
+import { resolveOrganization } from "@/lib/orgResolver"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -25,23 +20,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     let orgId = body.organizationId
+    let resolutionSource: string | null = null
     if (!orgId && body.organizationName) {
-      const normalizedName = normalizeOrgName(body.organizationName)
-      let org = await prisma.organization.findUnique({ where: { normalizedName } })
-      if (!org) {
-        const alias = await prisma.organizationAlias.findFirst({
-          where: { alias: body.organizationName },
-        })
-        if (alias) {
-          org = await prisma.organization.findUnique({ where: { id: alias.organizationId } })
-        }
+      const result = await resolveOrganization(prisma, body.organizationName)
+      if (!result.organization) {
+        return NextResponse.json(
+          { error: "Organization not resolved", resolutionSource: result.resolutionSource },
+          { status: 422 }
+        )
       }
-      if (!org) {
-        org = await prisma.organization.create({
-          data: { name: body.organizationName.trim(), normalizedName },
-        })
-      }
-      orgId = org.id
+      orgId = result.organization.id
+      resolutionSource = result.resolutionSource
     }
 
     if (!orgId) {
@@ -90,6 +79,7 @@ export async function POST(request: NextRequest) {
         sourceSystem: body.sourceSystem || null,
         sourceId: body.sourceId || null,
         sourceClaimId: body.sourceClaimId || null,
+        resolutionSource,
       },
     })
     return NextResponse.json(signal, { status: 201 })

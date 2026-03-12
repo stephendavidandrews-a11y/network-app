@@ -1254,6 +1254,7 @@ model ContactAffiliation {
   sourceSystem    String?  @map("source_system")
   sourceId        String?  @map("source_id")
   sourceClaimId   String?  @map("source_claim_id")
+  resolutionSource String? @map("resolution_source")
   createdAt       String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
   updatedAt       String   @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
@@ -1277,6 +1278,7 @@ model OrganizationSignal {
   sourceSystem    String? @map("source_system")
   sourceId        String? @map("source_id")
   sourceClaimId   String? @map("source_claim_id")
+  resolutionSource String? @map("resolution_source")
   createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
   updatedAt       String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 

@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-
-function normalizeOrgName(name: string): string {
-  return name.toLowerCase().trim()
-    .replace(/[.,]/g, "")
-    .replace(/\s+/g, " ")
-}
+import { normalizeOrgName } from "@/lib/orgResolver"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -20,8 +15,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(org)
   }
 
+  if (q) {
+    const normalizedQ = normalizeOrgName(q)
+    const orgs = await prisma.organization.findMany({
+      where: {
+        OR: [
+          { normalizedName: { contains: normalizedQ } },
+          { name: { contains: q } },
+          { aliases: { some: { alias: { contains: normalizedQ } } } },
+        ],
+      },
+      include: { aliases: true, _count: { select: { affiliations: true, signals: true } } },
+      orderBy: { name: "asc" },
+      take: 50,
+    })
+    return NextResponse.json(orgs)
+  }
+
   const orgs = await prisma.organization.findMany({
-    where: q ? { OR: [{ normalizedName: { contains: normalizeOrgName(q) } }, { name: { contains: q } }] } : {},
     include: { aliases: true, _count: { select: { affiliations: true, signals: true } } },
     orderBy: { name: "asc" },
     take: 50,
@@ -61,10 +72,11 @@ export async function POST(request: NextRequest) {
       })
 
       if (body.alias) {
-        const aliasExists = existing.aliases.some((a: { alias: string }) => a.alias.toLowerCase() === body.alias.toLowerCase())
+        const normalizedAlias = normalizeOrgName(body.alias)
+        const aliasExists = existing.aliases.some((a: { alias: string }) => a.alias === normalizedAlias)
         if (!aliasExists) {
           await prisma.organizationAlias.create({
-            data: { organizationId: existing.id, alias: body.alias, aliasType: body.aliasType || null },
+            data: { organizationId: existing.id, alias: normalizedAlias, aliasType: body.aliasType || null },
           })
         }
       }
@@ -89,8 +101,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (body.alias) {
+      const normalizedAlias = normalizeOrgName(body.alias)
       await prisma.organizationAlias.create({
-        data: { organizationId: org.id, alias: body.alias, aliasType: body.aliasType || null },
+        data: { organizationId: org.id, alias: normalizedAlias, aliasType: body.aliasType || null },
       })
     }
 
