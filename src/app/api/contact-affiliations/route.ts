@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { resolveOrganization } from "@/lib/orgResolver"
+import { syncPrimaryAffiliationToContact, SyncResult } from "@/lib/affiliationSync"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -47,6 +48,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "organizationId or organizationName required" }, { status: 400 })
     }
 
+    // isPrimary policy: conservative default.
+    // isPrimary is a policy field, not a raw extracted fact.
+    // New affiliations from Sauron (sourceSystem=sauron) default to false.
+    // Only explicit isPrimary=true in payload or the sync decision tree may promote.
+    let isPrimaryValue = false
+    if (body.isPrimary === true) {
+      isPrimaryValue = true
+    }
+
+    // If setting isPrimary=true, enforce single-primary invariant:
+    // clear isPrimary on all other current affiliations for this contact
+    if (isPrimaryValue) {
+      await prisma.contactAffiliation.updateMany({
+        where: { contactId: body.contactId, isCurrent: true, isPrimary: true },
+        data: { isPrimary: false, updatedAt: new Date().toISOString() },
+      })
+    }
+
     // Dedup: full triple
     if (body.sourceClaimId && body.sourceSystem && body.sourceId) {
       const existing = await prisma.contactAffiliation.findFirst({
@@ -55,9 +74,18 @@ export async function POST(request: NextRequest) {
       if (existing) {
         const updated = await prisma.contactAffiliation.update({
           where: { id: existing.id },
-          data: { title: body.title ?? existing.title, department: body.department ?? existing.department, roleType: body.roleType ?? existing.roleType, isCurrent: body.isCurrent ?? existing.isCurrent, notes: body.notes ?? existing.notes },
+          data: {
+            title: body.title ?? existing.title,
+            department: body.department ?? existing.department,
+            roleType: body.roleType ?? existing.roleType,
+            isCurrent: body.isCurrent ?? existing.isCurrent,
+            isPrimary: isPrimaryValue || existing.isPrimary,
+            notes: body.notes ?? existing.notes,
+          },
         })
-        return NextResponse.json(updated, { status: 200 })
+        // Run sync after update
+        const syncResult = await syncPrimaryAffiliationToContact(body.contactId)
+        return NextResponse.json({ ...updated, syncResult }, { status: 200 })
       }
     }
 
@@ -69,9 +97,15 @@ export async function POST(request: NextRequest) {
       if (contentMatch) {
         const updated = await prisma.contactAffiliation.update({
           where: { id: contentMatch.id },
-          data: { title: body.title ?? contentMatch.title, department: body.department ?? contentMatch.department, isCurrent: body.isCurrent ?? contentMatch.isCurrent },
+          data: {
+            title: body.title ?? contentMatch.title,
+            department: body.department ?? contentMatch.department,
+            isCurrent: body.isCurrent ?? contentMatch.isCurrent,
+            isPrimary: isPrimaryValue || contentMatch.isPrimary,
+          },
         })
-        return NextResponse.json(updated, { status: 200 })
+        const syncResult = await syncPrimaryAffiliationToContact(body.contactId)
+        return NextResponse.json({ ...updated, syncResult }, { status: 200 })
       }
     }
 
@@ -83,6 +117,7 @@ export async function POST(request: NextRequest) {
         department: body.department || null,
         roleType: body.roleType || null,
         isCurrent: body.isCurrent ?? true,
+        isPrimary: isPrimaryValue,
         startDate: body.startDate || null,
         endDate: body.endDate || null,
         notes: body.notes || null,
@@ -92,7 +127,10 @@ export async function POST(request: NextRequest) {
         resolutionSource,
       },
     })
-    return NextResponse.json(affiliation, { status: 201 })
+
+    // Run sync after create
+    const syncResult = await syncPrimaryAffiliationToContact(body.contactId)
+    return NextResponse.json({ ...affiliation, syncResult }, { status: 201 })
   } catch (error) {
     console.error("[Affiliations] POST error:", error)
     return NextResponse.json({ error: String(error) }, { status: 500 })

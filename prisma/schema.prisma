@@ -1224,6 +1224,9 @@ model Organization {
   aliases               OrganizationAlias[]
   affiliations          ContactAffiliation[]
   signals               OrganizationSignal[]
+  // OrganizationClassification = narrower regulatory/institutional category membership; multiple per org
+  // DISTINCT from orgType (broad institutional kind) and industry (sector/domain)
+  classifications        OrganizationClassification[]
 
   @@index([domain])
   @@index([normalizedName])
@@ -1251,6 +1254,9 @@ model ContactAffiliation {
   department      String?
   roleType        String?  @map("role_type")
   isCurrent       Boolean  @default(true) @map("is_current")
+  // isPrimary is a policy field, not a raw extracted fact.
+  // Only the sync decision tree or explicit user action sets this to true.
+  isPrimary       Boolean  @default(false) @map("is_primary")
   startDate       String?  @map("start_date")
   endDate         String?  @map("end_date")
   notes           String?
@@ -1291,4 +1297,28 @@ model OrganizationSignal {
   @@index([signalType])
   @@index([sourceSystem, sourceId, sourceClaimId])
   @@map("organization_signals")
+}
+
+// OrganizationClassification = narrower regulatory/institutional category membership
+// DISTINCT from orgType (broad institutional kind) and industry (sector/domain)
+// Examples: DCO, DCM, SEF, SDR, FCM, CPO, CTA, SD, MSP, SRO, federal_agency, etc.
+// An org may have multiple active classifications.
+model OrganizationClassification {
+  id                    String  @id @default(uuid())
+  organizationId        String  @map("organization_id")
+  classificationType    String  @map("classification_type")
+  classificationSystem  String  @map("classification_system")
+  isActive              Boolean @default(true) @map("is_active")
+  effectiveDate         String? @map("effective_date")
+  endDate               String? @map("end_date")
+  createdAt             String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt             String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, classificationType, classificationSystem])
+  @@index([classificationType])
+  @@index([classificationSystem])
+  @@index([organizationId])
+  @@map("organization_classifications")
 }
