@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     where,
     include: {
       contact: { select: { id: true, name: true } },
-      organization: { select: { id: true, name: true } },
+      organization: { select: { id: true, name: true, industry: true } },
     },
     orderBy: [{ isCurrent: "desc" }, { createdAt: "desc" }],
   })

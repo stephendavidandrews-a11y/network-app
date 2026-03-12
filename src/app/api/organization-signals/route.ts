@@ -82,6 +82,25 @@ export async function POST(request: NextRequest) {
         resolutionSource,
       },
     })
+
+    // Step 8A (Wave 2): industry_mention side-effect
+    // When signal type is industry_mention and the org has no industry yet,
+    // auto-populate Organization.industry. Conservative: only fill when blank.
+    if (body.signalType === "industry_mention" && body.industry) {
+      try {
+        const org = await prisma.organization.findUnique({ where: { id: orgId } })
+        if (org && !org.industry) {
+          await prisma.organization.update({
+            where: { id: orgId },
+            data: { industry: body.industry },
+          })
+        }
+      } catch (sideEffectError) {
+        // Non-fatal: log but don't fail the signal creation
+        console.error("[OrgSignals] industry_mention side-effect error:", sideEffectError)
+      }
+    }
+
     return NextResponse.json(signal, { status: 201 })
   } catch (error) {
     console.error("[OrgSignals] POST error:", error)

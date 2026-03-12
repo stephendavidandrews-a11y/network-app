@@ -66,6 +66,8 @@ export async function POST(request: NextRequest) {
           hqCity: body.hqCity ?? existing.hqCity,
           hqStateRegion: body.hqStateRegion ?? existing.hqStateRegion,
           hqCountry: body.hqCountry ?? existing.hqCountry,
+          // industry = sector/domain (distinct from orgType = institutional kind)
+          industry: body.industry ?? existing.industry,
           updatedAt: new Date().toISOString().replace("T", " ").slice(0, 19),
         },
         include: { aliases: true },
@@ -97,6 +99,8 @@ export async function POST(request: NextRequest) {
         hqCity: body.hqCity || null,
         hqStateRegion: body.hqStateRegion || null,
         hqCountry: body.hqCountry || null,
+        // industry = sector/domain (distinct from orgType = institutional kind)
+        industry: body.industry || null,
       },
     })
 
