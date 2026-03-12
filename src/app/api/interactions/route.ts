@@ -66,6 +66,9 @@ export async function POST(request: NextRequest) {
             sourceSystem: body.sourceSystem,
             sourceId: body.sourceId,
             sourceClaimId: c.sourceClaimId || null,
+            direction: c.direction || null,
+            kind: c.kind || null,
+            firmness: c.firmness || null,
           },
         })
       }
@@ -122,6 +125,9 @@ export async function POST(request: NextRequest) {
         sourceSystem: body.sourceSystem || null,
         sourceId: body.sourceId || null,
         sourceClaimId: c.sourceClaimId || null,
+        direction: c.direction || null,
+        kind: c.kind || null,
+        firmness: c.firmness || null,
       },
     })
   }

@@ -138,7 +138,6 @@ export default async function ContactDetailPage({
       personalRing: (contact as Record<string, unknown>).personalRing as string | null,
       personalCadenceDays: (contact as Record<string, unknown>).personalCadenceDays as number | null,
       howWeMet: (contact as Record<string, unknown>).howWeMet as string | null,
-      city: (contact as Record<string, unknown>).city as string | null,
       neighborhood: (contact as Record<string, unknown>).neighborhood as string | null,
       streetAddress: (contact as Record<string, unknown>).streetAddress as string | null,
       stateRegion: (contact as Record<string, unknown>).stateRegion as string | null,
@@ -228,6 +227,22 @@ export default async function ContactDetailPage({
       lastExtracted: interpretiveRow.lastExtracted,
     } : null,
   } : null
+
+  // Profile intelligence signals from Sauron (vocal insights, what-changed)
+  const profileSignals = await prisma.contactProfileSignal.findMany({
+    where: { contactId: params.id },
+    orderBy: { createdAt: 'desc' },
+    take: 30,
+    select: {
+      id: true,
+      signalType: true,
+      content: true,
+      confidence: true,
+      conversationDate: true,
+      sourceSystem: true,
+      createdAt: true,
+    },
+  })
 
   // Voice profile (tier selection: per_contact > archetype > fallback)
   let voiceProfileData: {
@@ -396,6 +411,7 @@ export default async function ContactDetailPage({
       commStats={commStats}
       extractionData={extractionData}
       voiceData={voiceProfileData}
+      profileSignals={profileSignals}
     />
   )
 }

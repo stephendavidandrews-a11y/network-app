@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
         where: { name: { contains: search } },
         orderBy: { name: 'asc' },
         take: limit || 10,
-        select: { id: true, name: true, organization: true, photoUrl: true, contactType: true, personalRing: true, city: true },
+        select: { id: true, name: true, organization: true, photoUrl: true, contactType: true, personalRing: true },
       })
       return NextResponse.json({ contacts })
     }

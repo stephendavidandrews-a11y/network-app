@@ -40,6 +40,11 @@ export interface PrepContext {
     dateStart: string | null
     role: string
   }>
+  profileSignals: Array<{
+    signalType: string
+    content: string
+    conversationDate: string | null
+  }>
   daysSinceLastInteraction: number | null
   meetingTitle: string | null
   meetingTime: string | null
@@ -123,6 +128,18 @@ export async function assembleContactContext(
     )
   }
 
+  // Fetch profile signals (Sauron vocal insights, what-changed)
+  const profileSignals = await prisma.contactProfileSignal.findMany({
+    where: { contactId },
+    orderBy: { createdAt: 'desc' },
+    take: 15,
+    select: {
+      signalType: true,
+      content: true,
+      conversationDate: true,
+    },
+  })
+
   return {
     contact: {
       id: contact.id,
@@ -154,6 +171,11 @@ export async function assembleContactContext(
       detectedAt: s.detectedAt,
     })),
     sharedEvents,
+    profileSignals: profileSignals.map(ps => ({
+      signalType: ps.signalType,
+      content: ps.content,
+      conversationDate: ps.conversationDate,
+    })),
     daysSinceLastInteraction,
     meetingTitle: meetingTitle || null,
     meetingTime: meetingTime || null,
@@ -224,6 +246,11 @@ RECENT INTELLIGENCE SIGNALS (last 90 days):
 ${context.recentSignals.length > 0
     ? context.recentSignals.map(s => `- ${s.detectedAt}: [${s.signalType}] ${s.title}${s.description ? ` — ${s.description}` : ''}`).join('\n')
     : '- No recent signals'}
+
+PROFILE INTELLIGENCE (from voice analysis):
+${context.profileSignals.length > 0
+    ? context.profileSignals.map(ps => `- [${ps.signalType.replace(/_/g, ' ')}] ${ps.content}${ps.conversationDate ? ` (${ps.conversationDate})` : ''}`).join('\n')
+    : '- No profile signals'}
 
 SHARED EVENTS:
 ${context.sharedEvents.length > 0

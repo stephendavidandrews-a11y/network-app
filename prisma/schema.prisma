@@ -78,6 +78,7 @@ model Contact {
   personalInterests      PersonalInterest[]
   socialPlanAttendees    SocialPlanAttendee[]
   textExtractionProfiles TextExtractionProfile[]
+  profileSignals         ContactProfileSignal[]
   textVoiceProfiles      TextVoiceProfile[]
   socialEventAttendees   SocialEventAttendee[]
   textMessages           TextMessage[]
@@ -89,6 +90,7 @@ model Contact {
   podcastsAsProducer     Podcast[]               @relation("PodcastProducer")
   podcastOutreach        PodcastOutreach[]
   contactInterests       ContactInterest[]
+  affiliations           ContactAffiliation[]
 
   @@index([tier])
   @@index([status])
@@ -308,6 +310,9 @@ model Commitment {
   sourceSystem         String? @map("source_system")
   sourceId             String? @map("source_id")
   sourceClaimId        String? @map("source_claim_id")
+  direction            String?
+  kind                 String?
+  firmness             String?
 
   interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
   contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -527,20 +532,24 @@ model ContactPretext {
 model ContactProvenance {
   id                  String  @id @default(uuid())
   contactId           String  @map("contact_id")
-  sourceContactId     String  @map("source_contact_id")
+  sourceContactId     String? @map("source_contact_id")
   type                String
   eventId             String? @map("event_id")
   sourceInteractionId String? @map("source_interaction_id")
   sourceIngestionId   String? @map("source_ingestion_id")
   notes               String?
   createdAt           String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  sourceSystem        String? @map("source_system")
+  sourceId            String? @map("source_id")
+  sourceClaimId       String? @map("source_claim_id")
 
   contact       Contact @relation("ProvenanceContact", fields: [contactId], references: [id], onDelete: Cascade)
-  sourceContact Contact @relation("ProvenanceSource", fields: [sourceContactId], references: [id], onDelete: Cascade)
+  sourceContact Contact? @relation("ProvenanceSource", fields: [sourceContactId], references: [id], onDelete: Cascade)
 
-  @@unique([contactId, sourceContactId])
   @@index([contactId])
   @@index([sourceContactId])
+  @@index([contactId, sourceContactId])
+  @@index([sourceSystem, sourceId, sourceClaimId])
   @@map("contact_provenance")
 }
 
@@ -1165,4 +1174,116 @@ model ContactInterest {
 
   @@index([contactId])
   @@map("contact_interests")
+}
+
+model ContactProfileSignal {
+  id               String  @id @default(uuid())
+  contactId        String  @map("contact_id")
+  signalType       String  @map("signal_type")
+  content          String
+  confidence       Float?
+  conversationDate String? @map("conversation_date")
+  sourceSystem     String? @map("source_system")
+  sourceId         String? @map("source_id")
+  sourceClaimId    String? @map("source_claim_id")
+  createdAt        String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt        String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@map("contact_profile_signals")
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// Organization models (Step 4)
+// ═══════════════════════════════════════════════════════════════
+
+model Organization {
+  id                    String  @id @default(uuid())
+  name                  String
+  normalizedName        String  @unique @map("normalized_name")
+  legalName             String? @map("legal_name")
+  orgType               String? @map("org_type")
+  website               String?
+  domain                String?
+  description           String?
+  parentOrganizationId  String? @map("parent_organization_id")
+  hqCity                String? @map("hq_city")
+  hqStateRegion         String? @map("hq_state_region")
+  hqCountry             String? @map("hq_country")
+  isActive              Boolean @default(true) @map("is_active")
+  createdAt             String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt             String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  parentOrganization    Organization?          @relation("OrgParent", fields: [parentOrganizationId], references: [id])
+  childOrganizations    Organization[]         @relation("OrgParent")
+  aliases               OrganizationAlias[]
+  affiliations          ContactAffiliation[]
+  signals               OrganizationSignal[]
+
+  @@index([domain])
+  @@index([normalizedName])
+  @@map("organizations")
+}
+
+model OrganizationAlias {
+  id              String  @id @default(uuid())
+  organizationId  String  @map("organization_id")
+  alias           String
+  aliasType       String? @map("alias_type")
+  createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, alias])
+  @@map("organization_aliases")
+}
+
+model ContactAffiliation {
+  id              String   @id @default(uuid())
+  contactId       String   @map("contact_id")
+  organizationId  String   @map("organization_id")
+  title           String?
+  department      String?
+  roleType        String?  @map("role_type")
+  isCurrent       Boolean  @default(true) @map("is_current")
+  startDate       String?  @map("start_date")
+  endDate         String?  @map("end_date")
+  notes           String?
+  sourceSystem    String?  @map("source_system")
+  sourceId        String?  @map("source_id")
+  sourceClaimId   String?  @map("source_claim_id")
+  createdAt       String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt       String   @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  contact         Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([organizationId])
+  @@index([sourceSystem, sourceId, sourceClaimId])
+  @@map("contact_affiliations")
+}
+
+model OrganizationSignal {
+  id              String  @id @default(uuid())
+  organizationId  String  @map("organization_id")
+  signalType      String  @map("signal_type")
+  title           String?
+  description     String
+  confidence      Float?
+  observedAt      String? @map("observed_at")
+  sourceSystem    String? @map("source_system")
+  sourceId        String? @map("source_id")
+  sourceClaimId   String? @map("source_claim_id")
+  createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt       String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([signalType])
+  @@index([sourceSystem, sourceId, sourceClaimId])
+  @@map("organization_signals")
 }

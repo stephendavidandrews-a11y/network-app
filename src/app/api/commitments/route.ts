@@ -117,6 +117,9 @@ export async function POST(request: NextRequest) {
         data: {
           description: body.description || existing.description,
           dueDate: body.dueDate || body.resolvedDate || existing.dueDate,
+          direction: body.direction ?? existing.direction,
+          kind: body.kind ?? existing.kind,
+          firmness: body.firmness ?? existing.firmness,
         },
       })
       return NextResponse.json(updated, { status: 200 })
@@ -151,6 +154,9 @@ export async function POST(request: NextRequest) {
       sourceSystem: body.sourceSystem || null,
       sourceId: body.sourceId || null,
       sourceClaimId: body.sourceClaimId || null,
+      direction: body.direction || null,
+      kind: body.kind || null,
+      firmness: body.firmness || null,
     },
   })
 

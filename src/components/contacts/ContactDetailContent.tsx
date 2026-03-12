@@ -280,9 +280,18 @@ interface Props {
     archetype: string | null
     sentMessageCount: number
   } | null
+  profileSignals: Array<{
+    id: string
+    signalType: string
+    content: string
+    confidence: number | null
+    conversationDate: string | null
+    sourceSystem: string | null
+    createdAt: string
+  }>
 }
 
-export function ContactDetailContent({ contact, relationships, relatedContacts, commitments, latestPrep, dossier, standingOffers, provenanceAsDiscovered, provenanceAsSource, alsoAtOrg, personalData, commStats, extractionData, voiceData }: Props) {
+export function ContactDetailContent({ contact, relationships, relatedContacts, commitments, latestPrep, dossier, standingOffers, provenanceAsDiscovered, provenanceAsSource, alsoAtOrg, personalData, commStats, extractionData, voiceData, profileSignals }: Props) {
   const router = useRouter()
 
   const [contactType, setContactType] = useState(personalData ? (personalData.contactType || 'personal') : 'professional')
@@ -1332,6 +1341,39 @@ export function ContactDetailContent({ contact, relationships, relatedContacts, 
                     <p className="text-xs text-gray-400 italic mt-0.5">&ldquo;{offer.originalWords}&rdquo;</p>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Profile Intelligence (Sauron) */}
+          {profileSignals && profileSignals.length > 0 && (
+            <div className="rounded-lg border bg-white p-6">
+              <h3 className="text-xs font-semibold uppercase text-gray-400 mb-3">Profile Intelligence</h3>
+              <div className="space-y-3">
+                {(() => {
+                  const grouped: Record<string, typeof profileSignals> = {}
+                  for (const ps of profileSignals) {
+                    const type = ps.signalType.replace(/_/g, ' ').replace(/^vocal /, '')
+                    if (!grouped[type]) grouped[type] = []
+                    grouped[type].push(ps)
+                  }
+                  return Object.entries(grouped).map(([type, signals]) => (
+                    <div key={type}>
+                      <span className="inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-600 capitalize mb-1">{type}</span>
+                      {signals.map(s => (
+                        <p key={s.id} className="text-sm text-gray-700 ml-2">
+                          {s.content}
+                          {s.conversationDate && (
+                            <span className="text-xs text-gray-400 ml-1">({s.conversationDate})</span>
+                          )}
+                          {s.confidence !== null && s.confidence !== undefined && (
+                            <span className="text-xs text-gray-400 ml-1">[{Math.round(s.confidence * 100)}%]</span>
+                          )}
+                        </p>
+                      ))}
+                    </div>
+                  ))
+                })()}
               </div>
             </div>
           )}

@@ -11,7 +11,7 @@ export async function GET(
       include: {
         members: {
           include: {
-            contact: { select: { id: true, name: true, photoUrl: true, personalRing: true, city: true, phone: true } },
+            contact: { select: { id: true, name: true, photoUrl: true, personalRing: true, phone: true } },
           },
         },
       },

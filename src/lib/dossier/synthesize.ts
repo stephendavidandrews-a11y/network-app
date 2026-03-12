@@ -166,6 +166,13 @@ export async function synthesizeDossier(
     },
   })
 
+  // Fetch profile signals (Sauron vocal intelligence, what-changed, etc.)
+  const profileSignals = await prisma.contactProfileSignal.findMany({
+    where: { contactId },
+    orderBy: { createdAt: 'desc' },
+    take: 30,
+  })
+
   const relatedContactIds = relationships.map(r =>
     r.contactAId === contactId ? r.contactBId : r.contactAId
   )
@@ -293,6 +300,21 @@ ${relatedContacts.map(rc => {
 }).join('\n')}`
     : ''
 
+  const profileSection = profileSignals.length > 0
+    ? `## PROFILE INTELLIGENCE (from voice analysis)
+${(() => {
+  const grouped: Record<string, string[]> = {}
+  for (const ps of profileSignals) {
+    const type = ps.signalType.replace(/_/g, ' ').replace(/^vocal /, '')
+    if (!grouped[type]) grouped[type] = []
+    grouped[type].push(`${ps.content}${ps.conversationDate ? ` (${ps.conversationDate})` : ''}`)
+  }
+  return Object.entries(grouped).map(([type, items]) =>
+    `${type}:\n${items.map(i => `  - ${i}`).join('\n')}`
+  ).join('\n')
+})()}`
+    : ''
+
   let systemPrompt: string
   let userPrompt: string
 
@@ -372,6 +394,8 @@ ${lifeEventSection}
 ${resourceSection}
 
 ${networkSection}
+
+${profileSection}
 
 Generate the comprehensive dossier now. Be thorough — this is Stephen's primary reference document for this contact.`
   }

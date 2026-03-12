@@ -33,28 +33,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Upsert on sourceSystem + sourceId if provided
-  if (body.sourceSystem && body.sourceId) {
-    const existing = await prisma.contactRelationship.findFirst({
-      where: { sourceSystem: body.sourceSystem, sourceId: body.sourceId },
-    })
-    if (existing) {
-      const updated = await prisma.contactRelationship.update({
-        where: { id: existing.id },
-        data: {
-          relationshipType: body.relationshipType || existing.relationshipType,
-          strength: body.strength ?? existing.strength,
-          notes: body.notes || existing.notes,
-          observationSource: body.observationSource || existing.observationSource,
-          observationCount: { increment: 1 },
-          lastObserved: new Date().toISOString(),
-        },
-      })
-      return NextResponse.json(updated, { status: 200 })
-    }
-  }
-
-  // Also check for existing pair (A,B) or (B,A) to avoid duplicates
+  // Check for existing pair (A,B) or (B,A) to avoid duplicate relationships
   const existingPair = await prisma.contactRelationship.findFirst({
     where: {
       OR: [

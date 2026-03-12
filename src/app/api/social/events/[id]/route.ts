@@ -12,7 +12,7 @@ export async function GET(
         venue: true,
         attendees: {
           include: {
-            contact: { select: { id: true, name: true, photoUrl: true, personalRing: true, city: true } },
+            contact: { select: { id: true, name: true, photoUrl: true, personalRing: true } },
           },
         },
       },

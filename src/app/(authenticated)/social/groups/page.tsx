@@ -7,7 +7,7 @@ export default async function GroupsPage() {
       members: {
         include: {
           contact: {
-            select: { id: true, name: true, photoUrl: true, personalRing: true, city: true, lastInteractionDate: true },
+            select: { id: true, name: true, photoUrl: true, personalRing: true, lastInteractionDate: true },
           },
         },
       },
@@ -19,7 +19,7 @@ export default async function GroupsPage() {
     id: g.id, name: g.name, description: g.description,
     members: g.members.map(m => ({
       id: m.contact.id, name: m.contact.name, photoUrl: m.contact.photoUrl,
-      ring: m.contact.personalRing, city: m.contact.city, lastInteraction: m.contact.lastInteractionDate,
+      ring: m.contact.personalRing, lastInteraction: m.contact.lastInteractionDate,
     })),
   }))
 
