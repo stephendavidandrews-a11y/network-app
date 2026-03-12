@@ -26,6 +26,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'contactId and activity required' }, { status: 400 })
     }
 
+    // Dedup: if sourceClaimId provided, upsert by it; otherwise create
+    if (body.sourceClaimId && body.sourceSystem) {
+      const existing = await prisma.personalActivity.findFirst({
+        where: { sourceSystem: body.sourceSystem, sourceClaimId: body.sourceClaimId },
+      })
+      if (existing) {
+        const updated = await prisma.personalActivity.update({
+          where: { id: existing.id },
+          data: {
+            activity: body.activity.trim(),
+            confidence: body.confidence || existing.confidence,
+            lastMentioned: new Date().toISOString(),
+          },
+        })
+        return NextResponse.json(updated, { status: 200 })
+      }
+    }
+
     const activity = await prisma.personalActivity.create({
       data: {
         contactId: body.contactId,
@@ -33,6 +51,9 @@ export async function POST(request: NextRequest) {
         frequency: body.frequency || 'occasional',
         confidence: body.confidence || 'medium',
         source: body.source || 'manual',
+        sourceSystem: body.sourceSystem || null,
+        sourceId: body.sourceId || null,
+        sourceClaimId: body.sourceClaimId || null,
       },
     })
     return NextResponse.json(activity, { status: 201 })

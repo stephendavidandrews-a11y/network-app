@@ -26,12 +26,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'contactId and interest required' }, { status: 400 })
     }
 
+    // Dedup: if sourceClaimId provided, upsert by it; otherwise create
+    if (body.sourceClaimId && body.sourceSystem) {
+      const existing = await prisma.personalInterest.findFirst({
+        where: { sourceSystem: body.sourceSystem, sourceClaimId: body.sourceClaimId },
+      })
+      if (existing) {
+        const updated = await prisma.personalInterest.update({
+          where: { id: existing.id },
+          data: {
+            interest: body.interest.trim(),
+            confidence: body.confidence || existing.confidence,
+            mentionCount: existing.mentionCount + 1,
+            lastMentioned: new Date().toISOString(),
+          },
+        })
+        return NextResponse.json(updated, { status: 200 })
+      }
+    }
+
     const interest = await prisma.personalInterest.create({
       data: {
         contactId: body.contactId,
         interest: body.interest.trim(),
         confidence: body.confidence || 'medium',
         source: body.source || 'manual',
+        sourceSystem: body.sourceSystem || null,
+        sourceId: body.sourceId || null,
+        sourceClaimId: body.sourceClaimId || null,
       },
     })
     return NextResponse.json(interest, { status: 201 })

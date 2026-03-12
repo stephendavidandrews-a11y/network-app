@@ -11,18 +11,49 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const signal = await prisma.intelligenceSignal.create({
-    data: {
-      contactId: body.contactId,
-      signalType: body.signalType,
-      title: body.title,
-      description: body.description || null,
-      sourceUrl: body.sourceUrl || null,
-      sourceName: body.sourceName || null,
-      outreachHook: body.outreachHook || null,
-      relevanceScore: body.relevanceScore || 5.0,
-    },
-  })
-  return NextResponse.json(signal, { status: 201 })
+  try {
+    const body = await request.json()
+    if (!body.contactId || !body.signalType || !body.title) {
+      return NextResponse.json({ error: 'contactId, signalType, and title required' }, { status: 400 })
+    }
+
+    // Dedup: if sourceClaimId provided, upsert by it; otherwise create
+    if (body.sourceClaimId && body.sourceSystem) {
+      const existing = await prisma.intelligenceSignal.findFirst({
+        where: { sourceSystem: body.sourceSystem, sourceClaimId: body.sourceClaimId },
+      })
+      if (existing) {
+        const updated = await prisma.intelligenceSignal.update({
+          where: { id: existing.id },
+          data: {
+            title: body.title,
+            description: body.description ?? existing.description,
+            relevanceScore: body.relevanceScore ?? existing.relevanceScore,
+            outreachHook: body.outreachHook ?? existing.outreachHook,
+          },
+        })
+        return NextResponse.json(updated, { status: 200 })
+      }
+    }
+
+    const signal = await prisma.intelligenceSignal.create({
+      data: {
+        contactId: body.contactId,
+        signalType: body.signalType,
+        title: body.title,
+        description: body.description || null,
+        sourceUrl: body.sourceUrl || null,
+        sourceName: body.sourceName || null,
+        outreachHook: body.outreachHook || null,
+        relevanceScore: body.relevanceScore || 5.0,
+        sourceSystem: body.sourceSystem || null,
+        sourceId: body.sourceId || null,
+        sourceClaimId: body.sourceClaimId || null,
+      },
+    })
+    return NextResponse.json(signal, { status: 201 })
+  } catch (error) {
+    console.error('[Signals] POST error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }
