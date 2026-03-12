@@ -26,10 +26,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'contactId and interest required' }, { status: 400 })
     }
 
-    // Dedup: if sourceClaimId provided, upsert by it; otherwise create
-    if (body.sourceClaimId && body.sourceSystem) {
+    // Dedup: full triple (sourceSystem, sourceId, sourceClaimId) is the identity
+    if (body.sourceClaimId && body.sourceSystem && body.sourceId) {
       const existing = await prisma.personalInterest.findFirst({
-        where: { sourceSystem: body.sourceSystem, sourceClaimId: body.sourceClaimId },
+        where: {
+          sourceSystem: body.sourceSystem,
+          sourceId: body.sourceId,
+          sourceClaimId: body.sourceClaimId,
+        },
       })
       if (existing) {
         const updated = await prisma.personalInterest.update({

@@ -156,7 +156,7 @@ model IntelligenceSignal {
 
   @@index([contactId, detectedAt(sort: Desc)])
   @@index([detectedAt(sort: Desc)])
-  @@index([sourceSystem, sourceClaimId])
+  @@index([sourceSystem, sourceId, sourceClaimId])
   @@map("intelligence_signals")
 }
 
@@ -467,7 +467,7 @@ model ReferencedResource {
   contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
-  @@index([sourceSystem, sourceClaimId])
+  @@index([sourceSystem, sourceId, sourceClaimId])
   @@map("referenced_resources")
 }
 
@@ -605,7 +605,7 @@ model PersonalActivity {
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  @@index([sourceSystem, sourceClaimId])
+  @@index([sourceSystem, sourceId, sourceClaimId])
   @@map("personal_activities")
 }
 
@@ -647,7 +647,7 @@ model PersonalInterest {
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  @@index([sourceSystem, sourceClaimId])
+  @@index([sourceSystem, sourceId, sourceClaimId])
   @@map("personal_interests")
 }
 
