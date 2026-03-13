@@ -90,7 +90,7 @@ model Contact {
   podcastsAsHost         Podcast[]               @relation("PodcastHost")
   podcastsAsProducer     Podcast[]               @relation("PodcastProducer")
   podcastOutreach        PodcastOutreach[]
-  contactInterests    // DEPRECATED — see ContactInterest model       ContactInterest[]
+  contactInterests       ContactInterest[]
   affiliations           ContactAffiliation[]
 
   @@index([tier])
