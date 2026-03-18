@@ -19,7 +19,7 @@ model Contact {
   personalWebsite String? @map("personal_website")
   photoUrl        String? @map("photo_url")
 
-  tier       Int     @default(2)
+  tier       Int    @default(2)
   categories String @default("[]")
   tags       String @default("[]")
 
@@ -53,45 +53,73 @@ model Contact {
   discoveredVia         String? @map("discovered_via") // which contact/interaction surfaced this person
   dossierCurrentVersion Int?    @map("dossier_current_version")
 
-  interactions           Interaction[]
-  interactionParticipants InteractionParticipant[]
-  signals                IntelligenceSignal[]
-  outreachItems          OutreachQueue[]
-  relationshipsAsA       ContactRelationship[]   @relation("ContactA")
-  relationshipsAsB       ContactRelationship[]   @relation("ContactB")
-  meetingPreps           MeetingPrep[]
-  commitmentRecords      Commitment[]
-  enrichmentResults      EnrichmentResult[]
-  standingOffers         StandingOffer[]
-  schedulingLeads        SchedulingLead[]
-  lifeEvents             LifeEvent[]
-  referencedResources    ReferencedResource[]
-  dossierVersions        ContactDossier[]
-  ingestionItems         IngestionItem[]
-  pretexts               ContactPretext[]
-  textCommStats          TextContactCommStats[]
-  provenanceAsContact    ContactProvenance[]     @relation("ProvenanceContact")
-  provenanceAsSource     ContactProvenance[]     @relation("ProvenanceSource")
-  friendRelationshipsA   FriendRelationship[]    @relation("FriendA")
-  friendRelationshipsB   FriendRelationship[]    @relation("FriendB")
-  personalActivities     PersonalActivity[]
+  interactions             Interaction[]
+  interactionParticipants  InteractionParticipant[]
+  signals                  IntelligenceSignal[]
+  outreachItems            OutreachQueue[]
+  relationshipsAsA         ContactRelationship[]    @relation("ContactA")
+  relationshipsAsB         ContactRelationship[]    @relation("ContactB")
+  meetingPreps             MeetingPrep[]
+  commitmentRecords        Commitment[]
+  enrichmentResults        EnrichmentResult[]
+  standingOffers           StandingOffer[]
+  schedulingLeads          SchedulingLead[]
+  lifeEvents               LifeEvent[]
+  referencedResources      ReferencedResource[]
+  dossierVersions          ContactDossier[]
+  ingestionItems           IngestionItem[]
+  pretexts                 ContactPretext[]
+  textCommStats            TextContactCommStats[]
+  provenanceAsContact      ContactProvenance[]      @relation("ProvenanceContact")
+  provenanceAsSource       ContactProvenance[]      @relation("ProvenanceSource")
+  friendRelationshipsA     FriendRelationship[]     @relation("FriendA")
+  friendRelationshipsB     FriendRelationship[]     @relation("FriendB")
+  personalActivities       PersonalActivity[]
   personalGroupMemberships PersonalGroupMember[]
-  personalInterests      PersonalInterest[]
-  socialPlanAttendees    SocialPlanAttendee[]
-  textExtractionProfiles TextExtractionProfile[]
-  profileSignals         ContactProfileSignal[]
-  textVoiceProfiles      TextVoiceProfile[]
-  socialEventAttendees   SocialEventAttendee[]
-  textMessages           TextMessage[]
-  contentItemsAuthored   ContentItem[]           @relation("ContentAuthor")
-  extractionsAsPrimary   ContentExtraction[]     @relation("ExtractionContact")
-  extractionsAsSecond    ContentExtraction[]     @relation("ExtractionSecondContact")
-  draftCorrections       DraftCorrection[]
-  podcastsAsHost         Podcast[]               @relation("PodcastHost")
-  podcastsAsProducer     Podcast[]               @relation("PodcastProducer")
-  podcastOutreach        PodcastOutreach[]
-  contactInterests       ContactInterest[]
-  affiliations           ContactAffiliation[]
+  personalInterests        PersonalInterest[]
+  socialPlanAttendees      SocialPlanAttendee[]
+  textExtractionProfiles   TextExtractionProfile[]
+  profileSignals           ContactProfileSignal[]
+  textVoiceProfiles        TextVoiceProfile[]
+  socialEventAttendees     SocialEventAttendee[]
+  textMessages             TextMessage[]
+  contentItemsAuthored     ContentItem[]            @relation("ContentAuthor")
+  extractionsAsPrimary     ContentExtraction[]      @relation("ExtractionContact")
+  extractionsAsSecond      ContentExtraction[]      @relation("ExtractionSecondContact")
+  draftCorrections         DraftCorrection[]
+  podcastsAsHost           Podcast[]                @relation("PodcastHost")
+  podcastsAsProducer       Podcast[]                @relation("PodcastProducer")
+  podcastOutreach          PodcastOutreach[]
+  contactInterests         ContactInterest[]
+  affiliations             ContactAffiliation[]
+
+  // Reconciled fields (exist in DB)
+  city                      String?
+  stateRegion               String? @map("state_region")
+  neighborhood              String?
+  streetAddress             String? @map("street_address")
+  zipCode                   String? @map("zip_code")
+  partnerName               String? @map("partner_name")
+  partnerContactId          String? @map("partner_contact_id")
+  kids                      String?
+  howWeMet                  String? @map("how_we_met")
+  cftcPretext               String? @map("cftc_pretext")
+  hawleyPretext             String? @map("hawley_pretext")
+  emotionalContext          String? @map("emotional_context")
+  emotionalContextSet       String? @map("emotional_context_set")
+  communicationPref         String? @map("communication_pref")
+  dietaryNotes              String? @map("dietary_notes")
+  availabilityNotes         String? @map("availability_notes")
+  pathwayScore              Float   @default(0) @map("pathway_score")
+  pathwayNotes              String? @map("pathway_notes")
+  pathwayLastEval           String? @map("pathway_last_eval")
+  reciprocityPattern        String  @default("unknown") @map("reciprocity_pattern")
+  personalGroup             String? @map("personal_group")
+  ringSuggestionDismissed   String? @map("ring_suggestion_dismissed")
+  funnelSuggestionDismissed String? @map("funnel_suggestion_dismissed")
+
+  // Reconciled relations
+  textGroupChatMembers TextGroupChatMember[]
 
   @@index([tier])
   @@index([status])
@@ -126,8 +154,8 @@ model Interaction {
   sourceId          String? @map("source_id")
   createdAt         String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
-  contact           Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  ingestionItem     IngestionItem? @relation(fields: [sourceIngestionId], references: [id])
+  contact           Contact                  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ingestionItem     IngestionItem?           @relation(fields: [sourceIngestionId], references: [id])
   commitmentRecords Commitment[]
   participants      InteractionParticipant[]
 
@@ -137,18 +165,18 @@ model Interaction {
 }
 
 model InteractionParticipant {
-  id            String @id @default(uuid())
-  interactionId String @map("interaction_id")
-  contactId     String @map("contact_id")
-  role          String @default("participant") // participant, organizer, mentioned
-  speakerLabel  String? @map("speaker_label")  // SPEAKER_00, SPEAKER_01, etc.
+  id            String  @id @default(uuid())
+  interactionId String  @map("interaction_id")
+  contactId     String  @map("contact_id")
+  role          String  @default("participant") // participant, organizer, mentioned
+  speakerLabel  String? @map("speaker_label") // SPEAKER_00, SPEAKER_01, etc.
 
-  sourceSystem  String? @map("source_system")
-  sourceId      String? @map("source_id")
-  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  sourceSystem String? @map("source_system")
+  sourceId     String? @map("source_id")
+  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
-  interaction   Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
-  contact       Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@unique([interactionId, contactId])
   @@index([interactionId])
@@ -565,7 +593,7 @@ model ContactProvenance {
   sourceId            String? @map("source_id")
   sourceClaimId       String? @map("source_claim_id")
 
-  contact       Contact @relation("ProvenanceContact", fields: [contactId], references: [id], onDelete: Cascade)
+  contact       Contact  @relation("ProvenanceContact", fields: [contactId], references: [id], onDelete: Cascade)
   sourceContact Contact? @relation("ProvenanceSource", fields: [sourceContactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
@@ -622,17 +650,17 @@ model FriendRelationship {
 }
 
 model PersonalActivity {
-  id             String  @id @default(uuid())
-  contactId      String  @map("contact_id")
-  activity       String
-  frequency      String  @default("occasional")
-  confidence     String  @default("medium")
-  source         String  @default("manual")
-  lastMentioned  String? @map("last_mentioned")
-  sourceSystem   String? @map("source_system")
-  sourceId       String? @map("source_id")
-  sourceClaimId  String? @map("source_claim_id")
-  createdAt      String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  id            String  @id @default(uuid())
+  contactId     String  @map("contact_id")
+  activity      String
+  frequency     String  @default("occasional")
+  confidence    String  @default("medium")
+  source        String  @default("manual")
+  lastMentioned String? @map("last_mentioned")
+  sourceSystem  String? @map("source_system")
+  sourceId      String? @map("source_id")
+  sourceClaimId String? @map("source_claim_id")
+  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
@@ -664,17 +692,17 @@ model PersonalGroupMember {
 }
 
 model PersonalInterest {
-  id             String  @id @default(uuid())
-  contactId      String  @map("contact_id")
-  interest       String
-  confidence     String  @default("medium")
-  source         String  @default("manual")
-  mentionCount   Int     @default(0) @map("mention_count")
-  lastMentioned  String? @map("last_mentioned")
-  sourceSystem   String? @map("source_system")
-  sourceId       String? @map("source_id")
-  sourceClaimId  String? @map("source_claim_id")
-  createdAt      String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  id            String  @id @default(uuid())
+  contactId     String  @map("contact_id")
+  interest      String
+  confidence    String  @default("medium")
+  source        String  @default("manual")
+  mentionCount  Int     @default(0) @map("mention_count")
+  lastMentioned String? @map("last_mentioned")
+  sourceSystem  String? @map("source_system")
+  sourceId      String? @map("source_id")
+  sourceClaimId String? @map("source_claim_id")
+  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
@@ -725,8 +753,8 @@ model SocialPlan {
   description         String?
   coHosted            Boolean @default(false) @map("co_hosted")
 
-  venue          PersonalVenue?       @relation(fields: [suggestedVenueId], references: [id], onDelete: SetNull)
-  attendees      SocialPlanAttendee[]
+  venue     PersonalVenue?       @relation(fields: [suggestedVenueId], references: [id], onDelete: SetNull)
+  attendees SocialPlanAttendee[]
 
   @@map("social_plans")
 }
@@ -892,6 +920,7 @@ model TextGroupChat {
   isActive         Boolean @default(true) @map("is_active")
 
   messages TextMessage[]
+  members  TextGroupChatMember[]
 
   @@map("text_group_chats")
 }
@@ -1185,14 +1214,14 @@ model TriageFeedback {
 // DEPRECATED (Step J): Zero data, no API route, no provenance fields.
 // Use PersonalInterest instead (personal_interests table, /api/personal/interests).
 model ContactInterest {
-  id           String  @id @default(uuid())
-  contactId    String  @map("contact_id")
-  interest     String
-  confidence   String  @default("medium")
-  source       String  @default("manual")
-  mentionCount Int     @default(0) @map("mention_count")
+  id            String  @id @default(uuid())
+  contactId     String  @map("contact_id")
+  interest      String
+  confidence    String  @default("medium")
+  source        String  @default("manual")
+  mentionCount  Int     @default(0) @map("mention_count")
   lastMentioned String? @map("last_mentioned")
-  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  createdAt     String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
@@ -1218,39 +1247,38 @@ model ContactProfileSignal {
   @@map("contact_profile_signals")
 }
 
-
 // ═══════════════════════════════════════════════════════════════
 // Organization models (Step 4)
 // ═══════════════════════════════════════════════════════════════
 
 model Organization {
-  id                    String  @id @default(uuid())
-  name                  String
-  normalizedName        String  @unique @map("normalized_name")
-  legalName             String? @map("legal_name")
-  orgType               String? @map("org_type")
-  website               String?
-  domain                String?
-  description           String?
-  parentOrganizationId  String? @map("parent_organization_id")
-  hqCity                String? @map("hq_city")
-  hqStateRegion         String? @map("hq_state_region")
-  hqCountry             String? @map("hq_country")
+  id                   String  @id @default(uuid())
+  name                 String
+  normalizedName       String  @unique @map("normalized_name")
+  legalName            String? @map("legal_name")
+  orgType              String? @map("org_type")
+  website              String?
+  domain               String?
+  description          String?
+  parentOrganizationId String? @map("parent_organization_id")
+  hqCity               String? @map("hq_city")
+  hqStateRegion        String? @map("hq_state_region")
+  hqCountry            String? @map("hq_country")
   // industry = sector/domain the org operates in (e.g. Government/Regulatory, Market Infrastructure)
   // DISTINCT from orgType which is what kind of institution it is (e.g. regulator, exchange, bank)
-  industry              String? @map("industry")
-  isActive              Boolean @default(true) @map("is_active")
-  createdAt             String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
-  updatedAt             String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+  industry             String? @map("industry")
+  isActive             Boolean @default(true) @map("is_active")
+  createdAt            String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt            String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
-  parentOrganization    Organization?          @relation("OrgParent", fields: [parentOrganizationId], references: [id])
-  childOrganizations    Organization[]         @relation("OrgParent")
-  aliases               OrganizationAlias[]
-  affiliations          ContactAffiliation[]
-  signals               OrganizationSignal[]
+  parentOrganization Organization?                @relation("OrgParent", fields: [parentOrganizationId], references: [id])
+  childOrganizations Organization[]               @relation("OrgParent")
+  aliases            OrganizationAlias[]
+  affiliations       ContactAffiliation[]
+  signals            OrganizationSignal[]
   // OrganizationClassification = narrower regulatory/institutional category membership; multiple per org
   // DISTINCT from orgType (broad institutional kind) and industry (sector/domain)
-  classifications        OrganizationClassification[]
+  classifications    OrganizationClassification[]
 
   @@index([domain])
   @@index([normalizedName])
@@ -1258,41 +1286,41 @@ model Organization {
 }
 
 model OrganizationAlias {
-  id              String  @id @default(uuid())
-  organizationId  String  @map("organization_id")
-  alias           String
-  aliasType       String? @map("alias_type")
-  createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  id             String  @id @default(uuid())
+  organizationId String  @map("organization_id")
+  alias          String
+  aliasType      String? @map("alias_type")
+  createdAt      String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
 
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, alias])
   @@map("organization_aliases")
 }
 
 model ContactAffiliation {
-  id              String   @id @default(uuid())
-  contactId       String   @map("contact_id")
-  organizationId  String   @map("organization_id")
-  title           String?
-  department      String?
-  roleType        String?  @map("role_type")
-  isCurrent       Boolean  @default(true) @map("is_current")
+  id               String  @id @default(uuid())
+  contactId        String  @map("contact_id")
+  organizationId   String  @map("organization_id")
+  title            String?
+  department       String?
+  roleType         String? @map("role_type")
+  isCurrent        Boolean @default(true) @map("is_current")
   // isPrimary is a policy field, not a raw extracted fact.
   // Only the sync decision tree or explicit user action sets this to true.
-  isPrimary       Boolean  @default(false) @map("is_primary")
-  startDate       String?  @map("start_date")
-  endDate         String?  @map("end_date")
-  notes           String?
-  sourceSystem    String?  @map("source_system")
-  sourceId        String?  @map("source_id")
-  sourceClaimId   String?  @map("source_claim_id")
+  isPrimary        Boolean @default(false) @map("is_primary")
+  startDate        String? @map("start_date")
+  endDate          String? @map("end_date")
+  notes            String?
+  sourceSystem     String? @map("source_system")
+  sourceId         String? @map("source_id")
+  sourceClaimId    String? @map("source_claim_id")
   resolutionSource String? @map("resolution_source")
-  createdAt       String   @default(dbgenerated("(datetime('now'))")) @map("created_at")
-  updatedAt       String   @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+  createdAt        String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt        String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
-  contact         Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([organizationId])
@@ -1301,23 +1329,23 @@ model ContactAffiliation {
 }
 
 model OrganizationSignal {
-  id              String  @id @default(uuid())
-  organizationId  String  @map("organization_id")
-  signalType      String  @map("signal_type")
-  title           String?
-  description     String
-  confidence      Float?
-  observedAt      String? @map("observed_at")
-  sourceSystem    String? @map("source_system")
-  sourceId        String? @map("source_id")
-  sourceClaimId   String? @map("source_claim_id")
+  id               String  @id @default(uuid())
+  organizationId   String  @map("organization_id")
+  signalType       String  @map("signal_type")
+  title            String?
+  description      String
+  confidence       Float?
+  observedAt       String? @map("observed_at")
+  sourceSystem     String? @map("source_system")
+  sourceId         String? @map("source_id")
+  sourceClaimId    String? @map("source_claim_id")
   resolutionSource String? @map("resolution_source")
   relatedOrg       String? @map("related_org")
   relationshipType String? @map("relationship_type")
-  createdAt       String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
-  updatedAt       String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+  createdAt        String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt        String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([signalType])
@@ -1330,15 +1358,15 @@ model OrganizationSignal {
 // Examples: DCO, DCM, SEF, SDR, FCM, CPO, CTA, SD, MSP, SRO, federal_agency, etc.
 // An org may have multiple active classifications.
 model OrganizationClassification {
-  id                    String  @id @default(uuid())
-  organizationId        String  @map("organization_id")
-  classificationType    String  @map("classification_type")
-  classificationSystem  String  @map("classification_system")
-  isActive              Boolean @default(true) @map("is_active")
-  effectiveDate         String? @map("effective_date")
-  endDate               String? @map("end_date")
-  createdAt             String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
-  updatedAt             String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+  id                   String  @id @default(uuid())
+  organizationId       String  @map("organization_id")
+  classificationType   String  @map("classification_type")
+  classificationSystem String  @map("classification_system")
+  isActive             Boolean @default(true) @map("is_active")
+  effectiveDate        String? @map("effective_date")
+  endDate              String? @map("end_date")
+  createdAt            String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt            String  @default(dbgenerated("(datetime('now'))")) @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1347,4 +1375,67 @@ model OrganizationClassification {
   @@index([classificationSystem])
   @@index([organizationId])
   @@map("organization_classifications")
+}
+
+// --- Reconciled models (exist in DB but were missing from schema) ---
+
+model TextGroupChatMember {
+  id                String        @id @default(uuid())
+  groupChatId       String        @map("group_chat_id")
+  groupChat         TextGroupChat @relation(fields: [groupChatId], references: [id], onDelete: Cascade)
+  phoneNumber       String        @map("phone_number")
+  contactId         String?       @map("contact_id")
+  contact           Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  messageCount      Int           @default(0) @map("message_count")
+  participationRate Float         @default(0) @map("participation_rate")
+
+  @@unique([groupChatId, phoneNumber])
+  @@index([groupChatId])
+  @@index([contactId])
+  @@map("text_group_chat_members")
+}
+
+model DismissedIntelPerson {
+  id           String  @id @default(uuid())
+  name         String
+  organization String?
+  reason       String?
+  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  @@map("dismissed_intel_persons")
+}
+
+model JobQueue {
+  id           String  @id @default(uuid())
+  jobType      String  @map("job_type")
+  targetId     String? @map("target_id")
+  targetType   String? @map("target_type")
+  payload      String  @default("{}")
+  priority     Int     @default(5)
+  scheduledFor String? @map("scheduled_for")
+  status       String  @default("pending")
+  startedAt    String? @map("started_at")
+  completedAt  String? @map("completed_at")
+  error        String?
+  retryCount   Int     @default(0) @map("retry_count")
+  maxRetries   Int     @default(3) @map("max_retries")
+  createdAt    String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+
+  @@map("job_queue")
+}
+
+model ApiBudgetLog {
+  id               Int     @id @default(autoincrement())
+  timestamp        String  @default(dbgenerated("(datetime('now'))"))
+  date             String
+  caller           String
+  model            String
+  inputTokens      Int     @default(0) @map("input_tokens")
+  outputTokens     Int     @default(0) @map("output_tokens")
+  estimatedCostUsd Float   @default(0) @map("estimated_cost_usd")
+  status           String  @default("success")
+  errorMessage     String? @map("error_message")
+
+  @@index([date])
+  @@map("api_budget_log")
 }
