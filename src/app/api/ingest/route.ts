@@ -242,10 +242,9 @@ async function tryAudioAnalysis(filePath: string): Promise<AudioFeatures | undef
 
 export async function POST(request: NextRequest) {
   try {
-    // ── API Key Auth (for iOS Shortcuts / external integrations) ──
-    // If an X-API-Key header is present, validate it.
-    // Web app requests don't send this header (they're behind Caddy basic auth).
-    // iOS Shortcuts and external tools bypass Caddy and must provide a valid key.
+    // ── API Key Auth (for external integrations) ──
+    // Web app requests are authenticated via JWT middleware (src/middleware.ts).
+    // External callers (iOS Shortcuts, Sauron, etc.) must provide a valid API key.
     const apiKey = request.headers.get('x-api-key')
     const expectedKey = process.env.INGEST_API_KEY
 
