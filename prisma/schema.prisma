@@ -19,7 +19,7 @@ model Contact {
   personalWebsite String? @map("personal_website")
   photoUrl        String? @map("photo_url")
 
-  tier       Int
+  tier       Int     @default(2)
   categories String @default("[]")
   tags       String @default("[]")
 

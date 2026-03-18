@@ -249,9 +249,16 @@ export async function POST(request: NextRequest) {
     const apiKey = request.headers.get('x-api-key')
     const expectedKey = process.env.INGEST_API_KEY
 
-    if (apiKey && expectedKey && apiKey !== expectedKey) {
+    if (!expectedKey) {
       return NextResponse.json(
-        { error: 'Invalid API key' },
+        { error: 'INGEST_API_KEY not configured on server' },
+        { status: 503 }
+      )
+    }
+
+    if (!apiKey || apiKey !== expectedKey) {
+      return NextResponse.json(
+        { error: 'Valid X-API-Key header required' },
         { status: 401 }
       )
     }

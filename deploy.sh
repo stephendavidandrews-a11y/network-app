@@ -31,7 +31,7 @@ npm ci --production=false
 npx prisma generate
 
 # Run migrations
-npx prisma db push --accept-data-loss 2>/dev/null || true
+npx prisma db push
 
 # Build
 npm run build
